@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "rime.h": "c",
+        "linkaddr.h": "c"
+    }
+}
