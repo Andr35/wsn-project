@@ -244,3 +244,6 @@ build/
 
 obj_sky/
 contiki-sky*
+src/sent.csv
+src/recv.csv
+
