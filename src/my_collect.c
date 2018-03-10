@@ -22,6 +22,7 @@ struct broadcast_callbacks bc_cb = {.recv=bc_recv};
 struct unicast_callbacks uc_cb = {.recv=uc_recv};
 
 bool is_the_sink = false;
+struct ctimer forward_beacon_timer;
 
 /*--------------------------------------------------------------------------------------*/
 void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_sink, const struct my_collect_callbacks *callbacks) {
@@ -41,7 +42,7 @@ void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_si
   is_the_sink = is_sink;
 
   if (is_the_sink) { // Only if the node is the sink, otherwise everybody starts sending stuff
-    printf("my_collect: Node %02x:%02x is the sink.\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
+    printf("<open> Node is the sink (node: %02x:%02x).\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
 
     // Sink has 0 as metric
     conn->metric = 0;
@@ -68,8 +69,8 @@ void send_beacon(struct my_collect_conn* conn) {
 
   packetbuf_clear();
   packetbuf_copyfrom(&beacon, sizeof(beacon));
-  printf("my_collect: sending beacon: seqn %d metric %d\n", conn->beacon_seqn, conn->metric);
   broadcast_send(&conn->bc);
+  printf("<out> <beacon> Beacon sent in broadcast (seqn: %d, metric: %d)\n", conn->beacon_seqn, conn->metric);
 }
 
 // Beacon timer callback
@@ -94,12 +95,14 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
   struct my_collect_conn* conn = (struct my_collect_conn*)(((uint8_t*)bc_conn) - offsetof(struct my_collect_conn, bc));
 
   if (packetbuf_datalen() != sizeof(struct beacon_msg)) {
-    printf("my_collect: broadcast of wrong size\n");
+    printf("<in_> <beacon> Beacon received but with the wrong size\n");
     return;
   }
+
   memcpy(&beacon, packetbuf_dataptr(), sizeof(struct beacon_msg));
   rssi = packetbuf_attr(PACKETBUF_ATTR_RSSI);
-  printf("my_collect: recv beacon from %02x:%02x seqn %u metric %u rssi %d\n", sender->u8[0], sender->u8[1], beacon.seqn, beacon.metric, rssi);
+  printf("<in_> <beacon> Beacon received from: %02x:%02x (seqn: %u, metric: %u, rssi %d)\n",
+    sender->u8[0], sender->u8[1], beacon.seqn, beacon.metric, rssi);
 
   // TASK 3: analyse the received beacon, update the routing info (parent, metric), if needed
   // TASK 4: retransmit the beacon if the metric or the seqn has been updated
@@ -112,18 +115,22 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
 
     // Update parent if metric is better and RSSI is tolerable (> -95 dBm)
     if ((beacon.metric < conn->metric)  && (rssi > RSSI_THRESHOLD)) {
-      printf("my_collect: beacon has better metric: %u. Update parent to %02x:%02x ...\n", beacon.metric, sender->u8[0], sender->u8[1]);
+      printf("<in_> <beacon> Received beacon has a better metric (%u < %u) New parent is node %02x:%02x\n",
+        beacon.metric, conn->metric, sender->u8[0], sender->u8[1]);
 
       // Update current metric info and update parent
       conn->metric = beacon.metric + 1;
       linkaddr_copy(&conn->parent, sender);
 
       // Retransmit beacon to other nodes (with updated metric)
-      send_beacon(conn);
+      // Wait some random time to avoid (hopefully) collision
+      printf("<in_> <beacon> Schedule beacon forwarding in %d seconds\n", BEACON_FORWARD_DELAY);
+      // send_beacon(conn);
+      ctimer_set(&forward_beacon_timer, BEACON_FORWARD_DELAY, send_beacon, conn);
     }
 
   } else {
-      printf("my_collect: received old beacon with seqn %u (current seqn %u). Discard it\n", beacon.seqn, conn->beacon_seqn);
+      printf("<in_> <beacon> Received an old beacon (current node seqn %u, beacon seqn: %u). Discarded.\n", conn->beacon_seqn, beacon.seqn);
   }
 }
 
@@ -139,7 +146,7 @@ int my_collect_send(struct my_collect_conn *conn) {
   struct collect_header hdr = {.source=linkaddr_node_addr, .hops=0};
 
   if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
-    printf("my_collect: ATTENTION! Trying to send a collect packet but parent is missing!\n");
+    printf("<out> <packet> <ERROR> Trying to send a data collection packet but node's parent is missing!\n");
     return 0; // no parent
   }
 
@@ -152,7 +159,7 @@ int my_collect_send(struct my_collect_conn *conn) {
   int alloc_res = packetbuf_hdralloc(sizeof(struct collect_header));
 
   if (alloc_res == 0) { // Allocation failed -> report error
-    printf("my_collect: ATTENTION! Trying to send a collect packet but fail allocating header buffer!\n");
+    printf("<out> <packet> <ERROR> Trying to send a data collection packet but node fails allocating header buffer!\n");
     return 0;
   }
 
@@ -171,7 +178,7 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
   struct collect_header hdr;
 
   if (packetbuf_datalen() < sizeof(struct collect_header)) {
-    printf("my_collect: too short unicast packet %d\n", packetbuf_datalen());
+    printf("<in_> <packet> <ERROR> Received a too short unicast packet! (length: %d)\n", packetbuf_datalen());
     return;
   }
 
@@ -189,19 +196,20 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
     int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header));
 
     if (hdr_reduce_res == 0) {
-      printf("my_collect: ATTENTION! Fail to reduce header. Packet will not be delivered to app!\n");
+      printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be delivered to app!\n");
       return;
     }
 
     // Send packet to application
     conn->callbacks->recv(&hdr.source, hdr.hops);
 
-    printf("my_collect: !!! Packet arrived to the sink! source: %02x:%02x hops: %u\n",  hdr.source.u8[0], hdr.source.u8[1], hdr.hops);
+    printf("<in_> <packet> <SUCCESS> Packet arrived to the sink! (source: %02x:%02x, hops: %u)\n",
+      hdr.source.u8[0], hdr.source.u8[1], hdr.hops);
   } else { // Packet needs to be forwarded to parent
 
     // Check for parent existence
     if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
-      printf("my_collect: ATTENTION! Trying to forward a packet but parent is missing!\n");
+      printf("<in_> <packet> <ERROR> Trying to forward a packet but node's parent is missing!\n");
       return; // no parent
     }
 
@@ -211,7 +219,7 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
     memcpy(packetbuf_dataptr(), &hdr, sizeof(struct collect_header));
     // Forward the packet to parent
     unicast_send(&conn->uc, &conn->parent);
-    printf("my_collect: !!! Packet forwarded to %02x:%02x current hops: %u\n",  conn->parent.u8[0], conn->parent.u8[1], hdr.hops);
+    printf("<in_> <packet> Packet forwarded to %02x:%02x (current hops: %u)\n", conn->parent.u8[0], conn->parent.u8[1], hdr.hops);
 
   }
 }
