@@ -6,7 +6,6 @@
 #include "my_collect.h"
 #include "net/netstack.h"
 #include "net/rime/rime.h"
-
 /*---------------------------------------------------------------------------*/
 #define APP_UPWARD_TRAFFIC 1
 #define APP_DOWNWARD_TRAFFIC 1

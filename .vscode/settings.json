@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "rime.h": "c",
-        "linkaddr.h": "c"
-    }
+        "linkaddr.h": "c",
+        "limits": "c"
+    },
+    "editor.formatOnSave": false
 }
