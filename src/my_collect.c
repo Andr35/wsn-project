@@ -8,7 +8,7 @@
 #include "core/net/linkaddr.h"
 #include "my_collect.h"
 
-#define BEACON_INTERVAL (CLOCK_SECOND*60)
+#define BEACON_INTERVAL (CLOCK_SECOND*10) // TODO set (CLOCK_SECOND*60)
 #define BEACON_FORWARD_DELAY (random_rand() % CLOCK_SECOND)
 
 #define RSSI_THRESHOLD -95
@@ -35,13 +35,16 @@ void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_si
   broadcast_open(&conn->bc, channels,     &bc_cb);
   unicast_open  (&conn->uc, channels + 1, &uc_cb);
 
-  // TODO 1: make the sink send beacons periodically
+  // TASK 1: make the sink send beacons periodically
 
   // Save is_sink value (used in on_recv callback)
   is_the_sink = is_sink;
 
   if (is_the_sink) { // Only if the node is the sink, otherwise everybody starts sending stuff
-    printf("my_collect: Node %02x:%02x is the sink.", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
+    printf("my_collect: Node %02x:%02x is the sink.\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
+
+    // Sink has 0 as metric
+    conn->metric = 0;
 
     // Params
     // c	A pointer to the callback timer.
@@ -71,7 +74,7 @@ void send_beacon(struct my_collect_conn* conn) {
 
 // Beacon timer callback
 void beacon_timer_cb(void* ptr) { // ptr is the connection (my_collect_conn* conn)
-  // TODO 2: implement the beacon callback
+  // TASK 2: implement the beacon callback
 
   // Cast param
   struct my_collect_conn *conn = (struct my_collect_conn *)ptr;
@@ -98,11 +101,14 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
   rssi = packetbuf_attr(PACKETBUF_ATTR_RSSI);
   printf("my_collect: recv beacon from %02x:%02x seqn %u metric %u rssi %d\n", sender->u8[0], sender->u8[1], beacon.seqn, beacon.metric, rssi);
 
-  // TODO 3: analyse the received beacon, update the routing info (parent, metric), if needed
-  // TODO 4: retransmit the beacon if the metric or the seqn has been updated
+  // TASK 3: analyse the received beacon, update the routing info (parent, metric), if needed
+  // TASK 4: retransmit the beacon if the metric or the seqn has been updated
 
   // Check if beacon is new (otherwise discard it)
   if (beacon.seqn > conn->beacon_seqn) { // Beacon has higher seqn than every beacon already seen
+
+    // Update current beacon seqn with the newest
+    conn->beacon_seqn = beacon.seqn;
 
     // Update parent if metric is better and RSSI is tolerable (> -95 dBm)
     if ((beacon.metric < conn->metric)  && (rssi > RSSI_THRESHOLD)) {
@@ -117,7 +123,7 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
     }
 
   } else {
-      printf("my_collect: received old beacon with seqn %u. Discard it\n", beacon.seqn);
+      printf("my_collect: received old beacon with seqn %u (current seqn %u). Discard it\n", beacon.seqn, conn->beacon_seqn);
   }
 }
 
@@ -137,7 +143,7 @@ int my_collect_send(struct my_collect_conn *conn) {
     return 0; // no parent
   }
 
-  // TODO 5:
+  // TASK 5:
   //  - allocate space for the header
   //  - insert the header
   //  - send the packet to the parent using unicast
@@ -169,7 +175,7 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
     return;
   }
 
-  // TODO 6:
+  // TASK 6:
   //  - extract the header
   //  - on the sink, remove the header and call the application callback
   //  - on a router, update the header and forward the packet to the parent using unicast
@@ -183,7 +189,7 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
     int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header));
 
     if (hdr_reduce_res == 0) {
-      printf("my_collect: ATTENTION! Fail to reduce header. Packet will not be delivered to app!");
+      printf("my_collect: ATTENTION! Fail to reduce header. Packet will not be delivered to app!\n");
       return;
     }
 

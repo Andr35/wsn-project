@@ -8,7 +8,7 @@
 TARGET ?= sky
 
 DEFINES=PROJECT_CONF_H=\"project-conf.h\"
-CONTIKI_PROJECT = app app-collect
+CONTIKI_PROJECT = app
 
 PROJECT_SOURCEFILES += my_collect.c
 
