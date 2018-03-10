@@ -238,3 +238,9 @@ build/
 .history
 
 # End of https://www.gitignore.io/api/nesc,latex,visualstudiocode
+
+
+### Contiki ###
+
+obj_sky/
+contiki-sky*
