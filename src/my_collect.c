@@ -107,8 +107,9 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
   // TASK 3: analyse the received beacon, update the routing info (parent, metric), if needed
   // TASK 4: retransmit the beacon if the metric or the seqn has been updated
 
-  // Check if beacon is new (otherwise discard it)
-  if (beacon.seqn > conn->beacon_seqn) { // Beacon has higher seqn than every beacon already seen
+  // Check if beacon is new or is the current one (already seen but maybe with a better metric) ->
+  // if true, analyze beacon metric (otherwise discard it)
+  if (beacon.seqn >= conn->beacon_seqn) { // Beacon has higher seqn than every beacon already seen
 
     // Update current beacon seqn with the newest
     conn->beacon_seqn = beacon.seqn;
@@ -132,6 +133,7 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
   } else {
       printf("<in_> <beacon> Received an old beacon (current node seqn %u, beacon seqn: %u). Discarded.\n", conn->beacon_seqn, beacon.seqn);
   }
+
 }
 
 /* Handling data packets --------------------------------------------------------------*/
