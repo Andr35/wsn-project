@@ -2,7 +2,8 @@
     "files.associations": {
         "rime.h": "c",
         "linkaddr.h": "c",
-        "limits": "c"
+        "limits": "c",
+        "type_traits": "c"
     },
     "editor.formatOnSave": false
 }
