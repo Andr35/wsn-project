@@ -154,8 +154,8 @@ struct collect_header { // Header structure for data packets
 // Our send function
 int my_collect_send(struct my_collect_conn *conn) {
   // is_command=false -> this is NOT a packet routed from sink (it is a data collection packet)
-  // nodes_length=1 -> add current node to the path array
-  struct collect_header hdr = {.source=linkaddr_node_addr, .hops=0, .is_command=false; .nodes_length=1};
+  // path_length=1 -> add current node to the path array
+  struct collect_header hdr = {.source=linkaddr_node_addr, .hops=0, .is_command=false, .path_length=1};
 
   if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
     printf("<out> <packet> <ERROR> Trying to send a data collection packet but node's parent is missing!\n");
@@ -315,13 +315,13 @@ void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_hea
 
       // Update hops and path length in header before forward
       hdr->hops += 1;
-      hdr->nodes_length -= 1;
+      hdr->path_length -= 1;
 
       // Overwrite the header present in packet buffer with new one
       memcpy(packetbuf_dataptr(), hdr, sizeof(struct collect_header));
 
       // Forward the packet to next node
-      unicast_send(&conn->uc, next_node_addr);
+      unicast_send(&conn->uc, &next_node_addr);
       printf("<out> <command> Packet forwarded to %02x:%02x (current hops: %u)\n", next_node_addr.u8[0], next_node_addr.u8[1], hdr->hops);
     }
 
@@ -340,7 +340,7 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
 
   // Prepare header
   // is_command=true -> this is a sink to node packet (one-to-many)
-  struct collect_header hdr = {.source=linkaddr_node_addr, .hops=0, .is_command=true; .nodes_length=0};
+  struct collect_header hdr = {.source=linkaddr_node_addr, .hops=0, .is_command=true, .path_length=0};
 
   // Create the route path to attach to the packet to help nodes to forward the packet
 
@@ -353,7 +353,7 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   if (nodes == 0) {
     printf("<out> <command> <ERROR> Cannot send command since there are not enough information to build routing path!\n");
     return 0;
-  } else if (nodes == -2) {
+  } else if (nodes == 255) {
     printf("<out> <command> <ERROR> Cannot send command since loop has been detected!\n");
     return 0;
   }
@@ -373,7 +373,7 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   // }
 
   // Update path length in header
-  hdr->nodes_length = path_length;
+  hdr.path_length = path_length;
 
   // Try to allocate space for header
   int alloc_res = packetbuf_hdralloc(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length)); // header + path array
@@ -393,7 +393,7 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
 
 
 
-/* Routing table managment ------------------------------------------------------------*/
+/* Routing table functions ------------------------------------------------------------*/
 
 /**
  * Update the routing table by adding a new <parent, child> pair
@@ -410,7 +410,7 @@ void update_routing_table(const linkaddr_t *parent, const linkaddr_t *child) {
  * the declared node do not exist.
  *
  */
-linkaddr_t get_child_routing_table(const linkaddr_t *parent) {
+linkaddr_t* get_child_routing_table(const linkaddr_t *parent) {
   // TODO impl
 
   return NULL;
@@ -420,10 +420,10 @@ linkaddr_t get_child_routing_table(const linkaddr_t *parent) {
  * Find a routing path to send a "command" packet (from sink to a destination node).
  *
  * Return the number of nodes in the path if path is found or
- *   0  if there are not enough information in routing table to build a path
- *   -2 if a loop is detected while building path
+ *   0   if there are not enough information in routing table to build a path
+ *   255 if a loop is detected while building path
  */
 uint8_t find_route_path(const linkaddr_t *dest) {
   // TODO impl
-  return -1;
+  return 255;
 }

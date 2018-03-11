@@ -60,4 +60,32 @@ int my_collect_send(struct my_collect_conn *c);
 int sr_send(struct my_collect_conn *c, const linkaddr_t *dest);
 
 
+/* Routing table functions ------------------------------------------------------------*/
+
+/**
+ * Update the routing table by adding a new <parent, child> pair
+ * or replacing it if parent already has a child entry.
+ *
+ */
+void update_routing_table(const linkaddr_t *parent, const linkaddr_t *child);
+
+/**
+ * Search the child of a node and return it.
+ * Return NULL if node has not a child or entries with
+ * the declared node do not exist.
+ *
+ */
+linkaddr_t* get_child_routing_table(const linkaddr_t *parent);
+
+/**
+ * Find a routing path to send a "command" packet (from sink to a destination node).
+ *
+ * Return the number of nodes in the path if path is found or
+ *   0   if there are not enough information in routing table to build a path
+ *   255 if a loop is detected while building path
+ */
+uint8_t find_route_path(const linkaddr_t *dest);
+
+
+
 #endif  // MY_COLLECT_H
