@@ -14,6 +14,9 @@ Wireless Sensor Network Project
 $ make
 $ cooja test.csc
 ```
+```sh
+$ cooja_nogui test_nogui_dc.csc
+```
 
 #### Evaluation
 

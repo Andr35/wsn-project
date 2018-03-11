@@ -55,7 +55,7 @@ PROCESS_THREAD(app_process, ev, data)
   static struct etimer rnd;
   static test_msg_t msg = {.seqn=0};
   static uint8_t dest_low = 2;
-  static linkaddr_t dest = {0x00, 0x00};
+  static linkaddr_t dest = {{0x00, 0x00}};
   static int ret;
 
   PROCESS_BEGIN();

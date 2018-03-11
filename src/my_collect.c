@@ -73,6 +73,12 @@ void send_beacon(struct my_collect_conn* conn) {
   printf("<out> <beacon> Beacon sent in broadcast (seqn: %d, metric: %d)\n", conn->beacon_seqn, conn->metric);
 }
 
+void send_beacon_cb(void* ptr) {
+  // Cast param
+  struct my_collect_conn *conn = (struct my_collect_conn *)ptr;
+  send_beacon(conn);
+}
+
 // Beacon timer callback
 void beacon_timer_cb(void* ptr) { // ptr is the connection (my_collect_conn* conn)
   // TASK 2: implement the beacon callback
@@ -115,7 +121,12 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
     conn->beacon_seqn = beacon.seqn;
 
     // Update parent if metric is better and RSSI is tolerable (> -95 dBm)
-    if ((beacon.metric < conn->metric)  && (rssi > RSSI_THRESHOLD)) {
+    // TODO use "beacon.metric + 1" or "beacon.metric"?
+    // 1) avoid extra broadcast if metric distance not change (same node contact current node with the same metric
+    //    and the current node avoid to re-broadcast the beacon)
+    // 2) if same node with the same metric recontact the current node, it rebroadcast the beacon ->
+    //    other nodes have the possibility to listen for the beacon if the first time has missed it
+    if (((beacon.metric) < conn->metric)  && (rssi > RSSI_THRESHOLD)) {
       printf("<in_> <beacon> Received beacon has a better metric (%u < %u) New parent is node %02x:%02x\n",
         beacon.metric, conn->metric, sender->u8[0], sender->u8[1]);
 
@@ -125,11 +136,11 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
 
       // Retransmit beacon to other nodes (with updated metric)
       // Wait some random time to avoid (hopefully) collision
-      printf("<in_> <beacon> Schedule beacon forwarding in %d seconds\n", BEACON_FORWARD_DELAY);
+      printf("<in_> <beacon> Schedule beacon forwarding in %lu seconds\n", BEACON_FORWARD_DELAY);
       // send_beacon(conn);
       // NB: here "&conn->beacon_timer" is used since in normal node it is unused and
       // in sink these lines of code are never executed (sink has always metric = 0)
-      ctimer_set(&conn->beacon_timer, BEACON_FORWARD_DELAY, send_beacon, conn);
+      ctimer_set(&conn->beacon_timer, BEACON_FORWARD_DELAY, send_beacon_cb, conn);
     }
 
   } else {
@@ -139,18 +150,6 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
 }
 
 /* Handling data packets --------------------------------------------------------------*/
-
-struct collect_header { // Header structure for data packets
-  linkaddr_t source;
-  uint8_t hops;
-
-  // True if the packet is a "command" packet sent from sink to another node (one-to-many) (it is a source routed packet).
-  bool is_command;
-  // Size of the array of node ids allocated after this header struct that represent the path
-  // used by a packet to arrive to the sink or to a node.
-  uint8_t path_length;
-} __attribute__((packed));
-
 // Our send function
 int my_collect_send(struct my_collect_conn *conn) {
   // is_command=false -> this is NOT a packet routed from sink (it is a data collection packet)
@@ -206,9 +205,9 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
 
 
   if (hdr.is_command) { // Packet is of type "command" (sent from sink)
-    handle_recv_command_packet(conn, from, &hdr);
+    handle_recv_command_packet(conn, &hdr, from);
   } else { // Packet is of type "data collection"
-    handle_recv_data_collection_packet(conn, from, &hdr);
+    handle_recv_data_collection_packet(conn, &hdr, from);
   }
 }
 
@@ -227,7 +226,7 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
     // TODO save routing data contained into the packet
 
     // Remove header
-    int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header));
+    int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + sizeof(linkaddr_t)); // TODO reduce correct size
 
     if (hdr_reduce_res == 0) {
       printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be delivered to app!\n");

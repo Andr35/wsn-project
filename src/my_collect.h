@@ -7,6 +7,18 @@
 #include "net/netstack.h"
 #include "net/rime/rime.h"
 
+/* Connection object */
+struct my_collect_conn {
+  struct broadcast_conn bc;
+  struct unicast_conn uc;
+  const struct my_collect_callbacks *callbacks;
+  linkaddr_t parent;
+  struct ctimer beacon_timer;
+  uint16_t metric;
+  uint16_t beacon_seqn;
+};
+
+
 /* Callback structure */
 struct my_collect_callbacks {
   void (*recv)(const linkaddr_t *originator, uint8_t hops);
@@ -24,16 +36,18 @@ struct my_collect_callbacks {
   void (*sr_recv)(struct my_collect_conn *c, uint8_t hops);
 };
 
-/* Connection object */
-struct my_collect_conn {
-  struct broadcast_conn bc;
-  struct unicast_conn uc;
-  const struct my_collect_callbacks *callbacks;
-  linkaddr_t parent;
-  struct ctimer beacon_timer;
-  uint16_t metric;
-  uint16_t beacon_seqn;
-};
+
+struct collect_header { // Header structure for data packets
+  linkaddr_t source;
+  uint8_t hops;
+
+  // True if the packet is a "command" packet sent from sink to another node (one-to-many) (it is a source routed packet).
+  bool is_command;
+  // Size of the array of node ids allocated after this header struct that represent the path
+  // used by a packet to arrive to the sink or to a node.
+  uint8_t path_length;
+} __attribute__((packed));
+
 
 /* Initialize a collect connection
  *  - conn -- a pointer to a connection object
@@ -58,6 +72,12 @@ int my_collect_send(struct my_collect_conn *c);
  *   non - zero if the packet could be sent , zero otherwise.
  */
 int sr_send(struct my_collect_conn *c, const linkaddr_t *dest);
+
+
+
+void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from);
+void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from);
+
 
 
 /* Routing table functions ------------------------------------------------------------*/
