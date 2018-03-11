@@ -22,7 +22,6 @@ struct broadcast_callbacks bc_cb = {.recv=bc_recv};
 struct unicast_callbacks uc_cb = {.recv=uc_recv};
 
 bool is_the_sink = false;
-struct ctimer forward_beacon_timer;
 
 /*--------------------------------------------------------------------------------------*/
 void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_sink, const struct my_collect_callbacks *callbacks) {
@@ -41,6 +40,7 @@ void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_si
   // Save is_sink value (used in on_recv callback)
   is_the_sink = is_sink;
 
+  // Sink ///////////////////////////////////////
   if (is_the_sink) { // Only if the node is the sink, otherwise everybody starts sending stuff
     printf("<open> Node is the sink (node: %02x:%02x).\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
 
@@ -127,7 +127,9 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
       // Wait some random time to avoid (hopefully) collision
       printf("<in_> <beacon> Schedule beacon forwarding in %d seconds\n", BEACON_FORWARD_DELAY);
       // send_beacon(conn);
-      ctimer_set(&forward_beacon_timer, BEACON_FORWARD_DELAY, send_beacon, conn);
+      // NB: here "&conn->beacon_timer" is used since in normal node it is unused and
+      // in sink these lines of code are never executed (sink has always metric = 0)
+      ctimer_set(&conn->beacon_timer, BEACON_FORWARD_DELAY, send_beacon, conn);
     }
 
   } else {
@@ -192,6 +194,7 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
   // Save header in hdr (read from "dataptr" to "dataptr" + sizeof header)
   memcpy(&hdr, packetbuf_dataptr(), sizeof(struct collect_header));
 
+  // Sink ///////////////////////////////////////
   if (is_the_sink) {
 
     // Remove header
@@ -207,6 +210,9 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
 
     printf("<in_> <packet> <SUCCESS> Packet arrived to the sink! (source: %02x:%02x, hops: %u)\n",
       hdr.source.u8[0], hdr.source.u8[1], hdr.hops);
+
+
+  // Common node ////////////////////////////////
   } else { // Packet needs to be forwarded to parent
 
     // Check for parent existence
