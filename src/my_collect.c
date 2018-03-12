@@ -224,10 +224,36 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
   // Sink ///////////////////////////////////////
   if (is_the_sink) {
 
-    // TODO save routing data contained into the packet
+    // Collect all <parent, child> relationships contained into the path // TODO
+    uint8_t path_length = hdr->path_length;
+    linkaddr_t path[path_length];
+
+    memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
+
+    if (path_length == 0) { // Error -> "no one send me the packet" -> some node does not respect model
+      printf("<in_> <packet> <ERROR> Fail to decode header -> path_length is 0");
+      return;
+    }
+
+    printf("<debug> path length: %u  (from: %02x:%02x) (source: %02x:%02x, hops: %u)\n",
+      path_length, from->u8[0], from->u8[1], hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
+
+    // Save <parent, child> relationship into routing table
+    // Iterate over "path" array and consider i-element as parent and (i+1)-element as child
+    int i;
+    for (i = 0; i < (path_length - 1); i++) { // -1 last element has no child
+      linkaddr_t parent = path[i];
+      linkaddr_t child = path[i + 1];
+      printf("<debug> <parent: %02x:%02x, child: %02x:%02x>\n",
+        parent.u8[0], parent.u8[1], child.u8[0], child.u8[1]);
+      // Update routing table
+      update_routing_table(&parent, &child);
+    }
+    // Add special pair <sink, last_path_elem>
+    update_routing_table(&linkaddr_node_addr, &path[path_length - 1]);
 
     // Remove header
-    int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + sizeof(linkaddr_t)); // TODO reduce correct size
+    int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length));
 
     if (hdr_reduce_res == 0) {
       printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be delivered to app!\n");
@@ -250,13 +276,45 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
       return; // no parent
     }
 
-    // TODO add routing data to packet
     // TODO handle loops
 
+    // Extract routing path from packet
+    uint8_t path_length = hdr->path_length;
+    linkaddr_t path[path_length];
+    memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
+
+    // TODO remove printf or simplify
+    int i;
+    printf("<in_> <packet> New collection packet to forward: (from: %02x:%02x, source: %02x:%02x, hops: %u, length: %u) [",
+      from->u8[0], from->u8[1], hdr->source.u8[0], hdr->source.u8[1], hdr->hops, path_length);
+    for (i = 0; i < path_length; i++) {
+      printf("%02x:%02x,", path[i].u8[0], path[i].u8[1]);
+    }
+    printf("]\n");
+
+
+    // Add current node address to the route path contained in packet
+
+    // Update path length in header before forward
+    hdr->path_length += 1;
     // Update hops in header before forward
     hdr->hops += 1;
+
+    // Allocate extra space in buffer header for new address
+    int alloc_res = packetbuf_hdralloc(sizeof(struct collect_header) + (sizeof(linkaddr_t) * hdr->path_length)); // header + path array
+
+    if (alloc_res == 0) { // Allocation failed -> report error
+      printf("<in_> <packet> <ERROR> Trying to forward a data collection packet but node fails allocating header buffer!\n");
+      return;
+    }
+
     // Overwrite the header present in packet buffer
-    memcpy(packetbuf_dataptr(), hdr, sizeof(struct collect_header));
+    memcpy(packetbuf_hdrptr(), hdr, sizeof(struct collect_header));
+    // Add current node address in packet buffer [_, D, E, F] -> [A, D, E, F]
+    memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &linkaddr_node_addr, sizeof(linkaddr_t));
+    // Overwrite path in packet (should be unuseful)
+    memcpy(packetbuf_hdrptr() + sizeof(struct collect_header) + sizeof(linkaddr_t), &path, (sizeof(linkaddr_t) * path_length));
+
     // Forward the packet to parent
     unicast_send(&conn->uc, &conn->parent);
     printf("<in_> <packet> Packet forwarded to %02x:%02x (current hops: %u)\n", conn->parent.u8[0], conn->parent.u8[1], hdr->hops);
@@ -388,7 +446,8 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   // Add current node to path array after the header
   memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &path, sizeof(linkaddr_t) * path_length);
   // Send packet to next node and report success
-  return unicast_send(&conn->uc, &next_node);
+  return 0;
+  // return unicast_send(&conn->uc, &next_node); // TODO enable
 }
 
 
