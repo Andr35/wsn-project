@@ -179,6 +179,7 @@ int my_collect_send(struct my_collect_conn *conn) {
   // Add current node to path array after the header
   memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &linkaddr_node_addr, sizeof(linkaddr_t));
   // Send packet to parent
+  printf("<out> <packet> Sending data collection packet to %02x:%02x\n", conn->parent.u8[0], conn->parent.u8[1]);
   return unicast_send(&conn->uc, &conn->parent);
 }
 
@@ -401,6 +402,8 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
  */
 void update_routing_table(const linkaddr_t *parent, const linkaddr_t *child) {
   // TODO impl
+  printf("<routing_table> Update table with <parent: %02x:%02x, child: %02x:%02x>\n",
+    parent->u8[0], parent->u8[1], child->u8[0], child->u8[1]);
 }
 
 /**
