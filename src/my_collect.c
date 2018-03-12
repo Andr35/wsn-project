@@ -228,15 +228,13 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
     uint8_t path_length = hdr->path_length;
     linkaddr_t path[path_length];
 
+    // Get route path from packet
     memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
 
     if (path_length == 0) { // Error -> "no one send me the packet" -> some node does not respect model
-      printf("<in_> <packet> <ERROR> Fail to decode header -> path_length is 0");
+      printf("<in_> <packet> <ERROR> path_length value in header is wrong -> path_length is 0");
       return;
     }
-
-    printf("<debug> path length: %u  (from: %02x:%02x) (source: %02x:%02x, hops: %u)\n",
-      path_length, from->u8[0], from->u8[1], hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
 
     // Save <parent, child> relationship into routing table
     // Iterate over "path" array and consider i-element as parent and (i+1)-element as child
@@ -244,8 +242,6 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
     for (i = 0; i < (path_length - 1); i++) { // -1 last element has no child
       linkaddr_t parent = path[i];
       linkaddr_t child = path[i + 1];
-      printf("<debug> <parent: %02x:%02x, child: %02x:%02x>\n",
-        parent.u8[0], parent.u8[1], child.u8[0], child.u8[1]);
       // Update routing table
       update_routing_table(&parent, &child);
     }
@@ -260,7 +256,7 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
       return;
     }
 
-    // Send packet to application
+    // Deliver packet to application
     conn->callbacks->recv(&hdr->source, hdr->hops);
 
     printf("<in_> <packet> <SUCCESS> Packet arrived to the sink! (source: %02x:%02x, hops: %u)\n",
