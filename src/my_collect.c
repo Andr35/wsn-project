@@ -435,6 +435,18 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   // Add current node to path array after the header
   memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &path, sizeof(linkaddr_t) * path_length);
   // Send packet to next node and report success
+
+  // TODO add \n
+  printf("<out> <command> Send command packet (dest: %02x:%02x, length: %d route: [", dest->u8[0], dest->u8[1], hdr.path_length);
+
+  // TODO remove log
+  int j = 0;
+  for (j = 0; j < hdr.path_length; j++) {
+    printf("%02x:%02x, ", path[j].u8[0], path[j].u8[1]);
+  }
+
+  printf("])\n");
+
   return unicast_send(&conn->uc, &next_node);
 }
 

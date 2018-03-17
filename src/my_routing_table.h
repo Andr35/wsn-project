@@ -76,4 +76,12 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest);
  */
 bool check_loop_presence(const linkaddr_t *route, int length, linkaddr_t new_node);
 
+
+
+/**
+ * Add a node to a node arrays and return the new node.
+ */
+linkaddr_t* route_add_node(linkaddr_t* array, int length, linkaddr_t node);
+
+
 #endif  // MY_ROUTING_TABLE_H

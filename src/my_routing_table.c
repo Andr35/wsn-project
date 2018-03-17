@@ -21,7 +21,7 @@ void routing_table_init() {
 
   // Check if success
   if (routing_table == NULL) {
-    printf("<routing_table> Fail to allocate routing table");
+    printf("<routing_table> Fail to allocate routing table\n");
     exit(-1);
   }
 
@@ -70,7 +70,7 @@ void routing_table_update_entry(const linkaddr_t *parent, const linkaddr_t *chil
 
     // Check if success
     if (new_entry == NULL) {
-      printf("<routing_table> Fail to allocate space for a new entry");
+      printf("<routing_table> Fail to allocate space for a new entry\n");
       exit(-1);
     }
 
@@ -86,17 +86,29 @@ void routing_table_update_entry(const linkaddr_t *parent, const linkaddr_t *chil
     current_entry->parent = *parent; // TODO copy addr?
   }
 
+  // TODO remove
+  printf("Current routing table: [\n");
+  int i = 0;
+  for (i = 0; i < 11; i++) {
+    if (routing_table[i] != NULL) {
+    printf("  child: %02x:%02x, parent: %02x:%02x\n",
+      routing_table[i]->child.u8[0], routing_table[i]->child.u8[1], routing_table[i]->parent.u8[0], routing_table[i]->parent.u8[1]);
+    }
+  }
+  printf("]\n");
+
 }
 
 
 struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
+  printf("<routing_table> <find_route> Search route for %02x:%02x\n", dest->u8[0], dest->u8[1]);
 
   // Init route with dest node
   linkaddr_t* route = (linkaddr_t*) malloc(sizeof(linkaddr_t));
   int route_length = 1;
 
     if (route == NULL) {
-      printf("<routing_table> Fail to allocate space for route");
+      printf("<routing_table> <find_route> Fail to allocate space for route\n");
       exit(-1);
     }
 
@@ -110,21 +122,25 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
 
     // Check of parent exists
     if (linkaddr_cmp(&parent_node, &linkaddr_null)) {
+      printf("<routing_table> <find_route> Fail to create route. Parent of %02x:%02x is missing\n", current_node.u8[0], current_node.u8[1]);
       return (struct source_route) {.route = NULL, .length = 0}; // Parent does not exists -> route is incomplete and cannot be created
     }
 
-    // Parent found -> update current route and proceed to next iteration
-    route = (linkaddr_t*) realloc(route, sizeof(linkaddr_t) * (route_length + 1));
+    // Parent found -> add current node to route array and proceed to next iteration
+    printf("<routing_table> <find_route> Found parent of %02x:%02x. It is %02x:%02x\n",
+       current_node.u8[0], current_node.u8[1], parent_node.u8[0], parent_node.u8[1]);
+    route = route_add_node(route, route_length, parent_node);
 
     if (route == NULL) {
-      printf("<routing_table> Fail to reallocate space for route");
+      printf("<routing_table> <find_route> Fail to reallocate space for route\n");
       exit(-1);
     }
 
-    route[route_length] = parent_node;
+    // Update route length
     route_length++;
 
     if (check_loop_presence(route, route_length, parent_node)) { // Loop found
+      printf("<routing_table> <find_route> Fail to create route. Loop has been detected\n");
       return (struct source_route) {.route = NULL, .length = 0}; // Loop found in route -> route cannot be used
     }
 
@@ -146,9 +162,11 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
       result[(result_length - 1) - i] = route[i];
     }
 
+    printf("<routing_table> <find_route> Complete route found\n");
     return (struct source_route) {.route = result, .length = result_length};
 
   } else {
+    printf("<routing_table> <find_route> Route search complete but not start from sink\n");
     return (struct source_route) {.route = NULL, .length = 0}; // Should not happen
   }
 
@@ -166,3 +184,29 @@ bool check_loop_presence(const linkaddr_t *route, int length, linkaddr_t new_nod
 
   return count > 1;
 };
+
+
+linkaddr_t* route_add_node(linkaddr_t* array, int length, linkaddr_t node) {
+
+  // Create new array
+  linkaddr_t* new_array = (linkaddr_t*) malloc(sizeof(linkaddr_t) * (length + 1));
+
+  // Check success
+  if (new_array == NULL) {
+    return NULL;
+  }
+
+  // Copy entries of old array into new one
+  int i = 0;
+  for (i = 0; i < length; i++) {
+    new_array[i] = array[i];
+  }
+  // Add new node on tail
+  new_array[length] = node;
+
+  // Free space
+  free(array);
+
+  // Return new array
+  return new_array;
+}
