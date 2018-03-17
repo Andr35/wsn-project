@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdbool.h>
 #include "contiki.h"
 #include "lib/random.h"
@@ -7,6 +8,7 @@
 #include <stdio.h>
 #include "core/net/linkaddr.h"
 #include "my_collect.h"
+#include "my_routing_table.h"
 
 #define BEACON_INTERVAL (CLOCK_SECOND*10) // TODO set (CLOCK_SECOND*60)
 #define BEACON_FORWARD_DELAY (random_rand() % CLOCK_SECOND)
@@ -42,18 +44,10 @@ void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_si
 
   // Sink ///////////////////////////////////////
   if (is_the_sink) { // Only if the node is the sink, otherwise everybody starts sending stuff
-    printf("<open> Node is the sink (node: %02x:%02x).\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
-
-    // Sink has 0 as metric
-    conn->metric = 0;
-
-    // Params
-    // c	A pointer to the callback timer.
-    // t	The interval before the timer expires.
-    // f	A function to be called when the timer expires.
-    // ptr	An opaque pointer that will be supplied as an argument to the callback function.
-    ctimer_set(&conn->beacon_timer, BEACON_INTERVAL, beacon_timer_cb, conn);
+    initialize_sink(conn);
   }
+
+  printf("<open> Node is %u.\n", linkaddr_node_addr.u16);
 }
 
 /* Handling beacons --------------------------------------------------------------------*/
@@ -400,31 +394,30 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
 
   // TODO get path
   // TODO check for loops
-
-  uint8_t nodes = find_route_path(dest);
+  struct source_route route = routing_table_find_route_path(dest);
 
   // Check for errors or detected loops
-  if (nodes == 0) {
-    printf("<out> <command> <ERROR> Cannot send command since there are not enough information to build routing path!\n");
-    return 0;
-  } else if (nodes == 255) {
-    printf("<out> <command> <ERROR> Cannot send command since loop has been detected!\n");
+  if (route.route == NULL) {
+    printf("<out> <command> <ERROR> Cannot send command since source routing path cannot be created (loop detected or missing info)!\n");
     return 0;
   }
 
   // Ok, build routing path array
 
   // Create path array (-1 to exclude first node from path -> sink will directly send packet to first node)
-  uint8_t path_length = nodes - 1;
+  uint8_t path_length = route.length - 1;
   linkaddr_t path[path_length];
   // First node to which the sink will send the packet
-  linkaddr_t next_node;
+  linkaddr_t next_node = route.route[0];
 
-  // TODO fill routing path (rember to exclude first node!!! -> set next_node)
+  // Fill routing path excluding first node
+  int i = 1;
+  for (i = 1; i < path_length; i++) {
+    path[i] = route.route[i];
+  }
 
-  // for ( i < nodes) {
-
-  // }
+  // Route is no more needed
+  free(route.route);
 
   // Update path length in header
   hdr.path_length = path_length;
@@ -442,45 +435,26 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   // Add current node to path array after the header
   memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &path, sizeof(linkaddr_t) * path_length);
   // Send packet to next node and report success
-  return 0;
-  // return unicast_send(&conn->uc, &next_node); // TODO enable
+  return unicast_send(&conn->uc, &next_node);
 }
 
 
 
-/* Routing table functions ------------------------------------------------------------*/
+/* Sink -------------------------------------------------------------------------------*/
 
-/**
- * Update the routing table by adding a new <parent, child> pair
- * or replacing it if parent already has a child entry.
- *
- */
-void update_routing_table(const linkaddr_t *parent, const linkaddr_t *child) {
-  // TODO impl
-  printf("<routing_table> Update table with <parent: %02x:%02x, child: %02x:%02x>\n",
-    parent->u8[0], parent->u8[1], child->u8[0], child->u8[1]);
-}
+void initialize_sink(struct my_collect_conn* conn) {
+    printf("<open> Node is the sink (node: %02x:%02x).\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]);
 
-/**
- * Search the child of a node and return it.
- * Return NULL if node has not a child or entries with
- * the declared node do not exist.
- *
- */
-linkaddr_t* get_child_routing_table(const linkaddr_t *parent) {
-  // TODO impl
+    // Sink has 0 as metric
+    conn->metric = 0;
 
-  return NULL;
-}
+    // Initialize routing table
+    routing_table_init();
 
-/**
- * Find a routing path to send a "command" packet (from sink to a destination node).
- *
- * Return the number of nodes in the path if path is found or
- *   0   if there are not enough information in routing table to build a path
- *   255 if a loop is detected while building path
- */
-uint8_t find_route_path(const linkaddr_t *dest) {
-  // TODO impl
-  return 255;
+    // Params
+    // c	A pointer to the callback timer.
+    // t	The interval before the timer expires.
+    // f	A function to be called when the timer expires.
+    // ptr	An opaque pointer that will be supplied as an argument to the callback function.
+    ctimer_set(&conn->beacon_timer, BEACON_INTERVAL, beacon_timer_cb, conn);
 }
