@@ -1,7 +1,8 @@
-#include <stdlib.h>
 #include <stdbool.h>
-#include "contiki.h"
 #include "core/net/linkaddr.h"
+#include "contiki.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "my_routing_table.h"
 
 
@@ -107,7 +108,7 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
     }
 
     // Parent found -> update current route and proceed to next iteration
-    route = realloc(route, sizeof(linkaddr_t) * (route_length + 1));
+    route = (linkaddr_t*) realloc(route, sizeof(linkaddr_t) * (route_length + 1));
 
     if (route == NULL) {
       printf("<routing_table> Fail to reallocate space for route");
@@ -158,114 +159,3 @@ bool check_loop_presence(const linkaddr_t *route, int length, linkaddr_t new_nod
 
   return count > 1;
 };
-
-
-
-// int routing_table_count_entries(linkaddr_t* entries, int length, linkaddr_t* addr) { // TODO remove?
-
-//   if (entries == NULL) {
-//     return 0;
-//   }
-
-//   int i = 0;
-//   int count = 0;
-
-//   for (i = 0; i < length; i++) {
-//     if (linkaddr_cmp(&entries[i], addr)) {
-//       count++;
-//     }
-//   }
-
-//   return count;
-// }
-
-
-
-// void routing_table_init() {
-
-//  // TODO how much allocate?
-//   routing_table =  (struct routing_table_entry**) malloc(routing_table_size);
-
-//   // Check if success
-//   if (routing_table == NULL) {
-//     printf("<routing_table> Fail to allocate routing table");
-//     exit(-1);
-//   }
-
-//   // Init all entries to NULL
-//   int i = 0;
-//   for (i = 0; i < routing_table_size; i++) {
-//     routing_table[i] = NULL;
-//   }
-
-// }
-
-// struct routing_table_entry** routing_table_get() {
-//   return routing_table;
-// }
-
-
-// struct routing_table_entry* routing_table_get_entry(const linkaddr_t *parent) {
-
-//   // Calc index in routing table
-//   uint16_t index = parent->u16;
-//   return routing_table[index];
-// }
-
-
-// void routing_table_add_child(const linkaddr_t *parent, const linkaddr_t *child) {
-
-//   printf("<routing_table> Updating table with <parent: %02x:%02x, child: %02x:%02x>\n",
-//     parent->u8[0], parent->u8[1], child->u8[0], child->u8[1]);
-
-//   // Calc index in routing table
-//   uint16_t index = parent->u16;
-
-//   // Get current entry
-//   struct routing_table_entry* current_entry = routing_table[index];
-
-//   if (current_entry == NULL) {
-//     // Initialize entry
-
-//     // Allocate new space for the entry
-//     struct routing_table_entry* new_entry = (struct routing_table_entry*) malloc(sizeof(struct routing_table_entry));
-
-//     // Check if success
-//     if (new_entry == NULL) {
-//       printf("<routing_table> Fail to allocate space for a new entry");
-//       exit(-1);
-//     }
-
-//     // Set values
-//     new_entry->parent = *parent; // TODO copy parent?
-//     new_entry->childs_length = 1;
-//     new_entry->childs = malloc(sizeof(linkaddr_t) * new_entry->childs_length);
-
-//     new_entry->childs[0] = *child;
-
-//     // Set pointer
-//     routing_table[index] = new_entry;
-//     current_entry = routing_table[index];
-
-//     return; // Child inserted -> nothing more to do
-//   }
-
-//   // Entry already exists -> add child to array in entry
-//   if (routing_table_count_entries(current_entry->childs, current_entry->childs_length, child) > 0) {
-//     // Child already exists in array -> do nothing
-//     return;
-//   } else { // Need to insert new child into array
-//     current_entry->childs = realloc(current_entry->childs, sizeof(linkaddr_t) * (current_entry->childs_length + 1));
-
-//     if (current_entry->childs == NULL) {
-//       printf("<routing_table> Fail to reallocate space for a new address in child array");
-//       exit(-1);
-//     }
-
-//     // Add child as last elem of array
-//     current_entry->childs[current_entry->childs_length] = *child;
-//     // Update size
-//     current_entry->childs_length = current_entry->childs_length + 1;
-//   }
-
-// }

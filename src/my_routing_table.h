@@ -37,7 +37,7 @@ void routing_table_init();
  * Get routing table.
  *
  */
-struct routing_table_entry* routing_table_get();
+struct routing_table_entry** routing_table_get();
 
 
 /**

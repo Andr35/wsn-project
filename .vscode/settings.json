@@ -3,7 +3,9 @@
         "rime.h": "c",
         "linkaddr.h": "c",
         "limits": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "my_routing_table.h": "c",
+        "malloc.h": "c"
     },
     "editor.formatOnSave": false
 }

@@ -237,10 +237,10 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
       linkaddr_t parent = path[i];
       linkaddr_t child = path[i + 1];
       // Update routing table
-      update_routing_table(&parent, &child);
+      routing_table_update_entry(&parent, &child);
     }
     // Add special pair <sink, last_path_elem>
-    update_routing_table(&linkaddr_node_addr, &path[path_length - 1]);
+    routing_table_update_entry(&linkaddr_node_addr, &path[path_length - 1]);
 
     // Remove header
     int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length));
