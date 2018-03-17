@@ -94,6 +94,12 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
   // Init route with dest node
   linkaddr_t* route = (linkaddr_t*) malloc(sizeof(linkaddr_t));
   int route_length = 1;
+
+    if (route == NULL) {
+      printf("<routing_table> Fail to allocate space for route");
+      exit(-1);
+    }
+
   // Current interaction destination node
   linkaddr_t current_node = *dest;
 
@@ -112,6 +118,7 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
 
     if (route == NULL) {
       printf("<routing_table> Fail to reallocate space for route");
+      exit(-1);
     }
 
     route[route_length] = parent_node;
