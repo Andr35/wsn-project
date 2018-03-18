@@ -74,7 +74,7 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest);
  * Return true if loop is found, false otherwise.
  *
  */
-bool check_loop_presence(const linkaddr_t *route, int length, linkaddr_t new_node);
+bool check_loop_presence(linkaddr_t *route, int length, linkaddr_t new_node);
 
 
 

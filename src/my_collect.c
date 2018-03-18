@@ -143,7 +143,9 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
 
 }
 
+
 /* Handling data packets --------------------------------------------------------------*/
+
 // Our send function
 int my_collect_send(struct my_collect_conn *conn) {
   // is_command=false -> this is NOT a packet routed from sink (it is a data collection packet)
@@ -218,7 +220,7 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
   // Sink ///////////////////////////////////////
   if (is_the_sink) {
 
-    // Collect all <parent, child> relationships contained into the path // TODO
+    // Collect all <parent, child> relationships contained into the path
     uint8_t path_length = hdr->path_length;
     linkaddr_t path[path_length];
 
@@ -266,8 +268,6 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
       return; // no parent
     }
 
-    // TODO handle loops
-
     // Extract routing path from packet
     uint8_t path_length = hdr->path_length;
     linkaddr_t path[path_length];
@@ -282,6 +282,15 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
     }
     printf("]\n");
 
+
+    // Check for loops -> if this node is present in path contained in packet, packet is
+    // already been forwarded by this node -> drop
+    bool loop = check_loop_presence(path, path_length, linkaddr_node_addr);
+
+    if (loop) { // Loop -> stop forwarding
+      printf("<in_> <packet> Packet cannot be forwarded beacuse a loop has been detected analyzing path");
+      return;
+    }
 
     // Add current node address to the route path contained in packet
 
@@ -384,16 +393,12 @@ void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_hea
 
 // Send command function
 int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
-  // TODO implement
 
   // Prepare header
   // is_command=true -> this is a sink to node packet (one-to-many)
   struct collect_header hdr = {.source=linkaddr_node_addr, .hops=0, .is_command=true, .path_length=0};
 
   // Create the route path to attach to the packet to help nodes to forward the packet
-
-  // TODO get path
-  // TODO check for loops
   struct source_route route = routing_table_find_route_path(dest);
 
   // Check for errors or detected loops
