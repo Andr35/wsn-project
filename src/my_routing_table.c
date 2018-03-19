@@ -139,7 +139,7 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
     // Update route length
     route_length++;
 
-    if (check_loop_presence(route, route_length, parent_node)) { // Loop found
+    if (check_loop_presence(route, route_length, parent_node) > 1) { // Loop found
       printf("<routing_table> <find_route> Fail to create route. Loop has been detected\n");
       return (struct source_route) {.route = NULL, .length = 0}; // Loop found in route -> route cannot be used
     }
@@ -172,17 +172,17 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
 
 }
 
-bool check_loop_presence(linkaddr_t *route, int length, linkaddr_t new_node) {
+int check_loop_presence(linkaddr_t *route, int length, linkaddr_t node) {
   int i = 0;
   int count = 0;
 
   for (i = 0; i < length; i++) {
-    if (linkaddr_cmp(&route[i], &new_node)) {
+    if (linkaddr_cmp(&route[i], &node)) {
       count++;
     }
   }
 
-  return count > 1;
+  return count;
 };
 
 

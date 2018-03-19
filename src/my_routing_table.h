@@ -71,10 +71,10 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest);
  *   length:   length of route array to check
  *   new_node: the last node inserted into route
  *
- * Return true if loop is found, false otherwise.
+ * Return how many times the node passed as input is present in the given route.
  *
  */
-bool check_loop_presence(linkaddr_t *route, int length, linkaddr_t new_node);
+int check_loop_presence(linkaddr_t *route, int length, linkaddr_t node);
 
 
 

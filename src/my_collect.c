@@ -285,9 +285,9 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
 
     // Check for loops -> if this node is present in path contained in packet, packet is
     // already been forwarded by this node -> drop
-    bool loop = check_loop_presence(path, path_length, linkaddr_node_addr);
+    int node_count = check_loop_presence(path, path_length, linkaddr_node_addr);
 
-    if (loop) { // Loop -> stop forwarding
+    if (node_count > 0) { // Loop -> stop forwarding
       printf("<in_> <packet> Packet cannot be forwarded beacuse a loop has been detected analyzing path");
       return;
     }
