@@ -242,7 +242,7 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
       routing_table_update_entry(&parent, &child);
     }
     // Add special pair <sink, last_path_elem>
-    routing_table_update_entry(&linkaddr_node_addr, &path[path_length - 1]);
+    routing_table_update_entry(&linkaddr_node_addr, &path[0]);
 
     // Remove header
     int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length));
@@ -329,6 +329,8 @@ void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct col
  *
  */
 void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from) {
+    printf("<out> <command> Received packet from %02x:%02x (header hops: %u, header path_length: %d)\n",
+      from->u8[0], from->u8[1], hdr->hops, hdr->path_length);
 
   // Sink ///////////////////////////////////////
   if (is_the_sink) {
@@ -339,28 +341,34 @@ void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_hea
   // Common node ////////////////////////////////
   } else { // Packet needs to be forwarded to parent
 
+    printf("<out> <command> Received packet to forward from %02x:%02x (current hops: %u, route length: %d)\n",
+      from->u8[0], from->u8[1], hdr->hops, hdr->path_length);
+
+
     // Check if this node is the recipient of the packet
     if (hdr->path_length == 0) { // Route path is empty -> current node is the recipient
+      printf("<in_> <command> Command will be delivered to node...\n");
 
-    // Remove header
-    int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header));
+      // Remove header
+      int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header));
 
-    if (hdr_reduce_res == 0) {
-      printf("<in_> <command> <ERROR> Fail to reduce header. Command packet will not be delivered to app!\n");
-      return;
-    }
+      if (hdr_reduce_res == 0) {
+        printf("<in_> <command> <ERROR> Fail to reduce header. Command packet will not be delivered to app!\n");
+        return;
+      }
 
-    // Deliver packet to application
-    conn->callbacks->sr_recv(conn, hdr->hops);
+      // Deliver packet to application
+      conn->callbacks->sr_recv(conn, hdr->hops);
 
-    printf("<in_> <command> <SUCCESS> Command arrived to the node! (source: %02x:%02x, hops: %u)\n",
-      hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
+      printf("<in_> <command> <SUCCESS> Command arrived to the node! (source: %02x:%02x, hops: %u)\n",
+        hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
 
     } else { // Node is NOT the recipient -> it must forward the packet to the next node
 
       linkaddr_t next_node_addr;
       // Extract next node from route path attached to packet header
-      memcpy(packetbuf_dataptr() + sizeof(struct collect_header), &next_node_addr, sizeof(linkaddr_t));
+      // memcpy(packetbuf_dataptr() + sizeof(struct collect_header), &next_node_addr, sizeof(linkaddr_t));
+      memcpy(&next_node_addr, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t));
 
       // Resize the packet buffer removing size of the extracted node address
       int hdr_reduce_res = packetbuf_hdrreduce(sizeof(linkaddr_t));
@@ -379,7 +387,8 @@ void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_hea
 
       // Forward the packet to next node
       unicast_send(&conn->uc, &next_node_addr);
-      printf("<out> <command> Packet forwarded to %02x:%02x (current hops: %u)\n", next_node_addr.u8[0], next_node_addr.u8[1], hdr->hops);
+      printf("<out> <command> Packet forwarded to %02x:%02x (current hops: %u, route length: %d)\n",
+        next_node_addr.u8[0], next_node_addr.u8[1], hdr->hops, hdr->path_length);
     }
 
   }
@@ -393,6 +402,7 @@ void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_hea
 
 // Send command function
 int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
+  printf("<out> <command> Try to send command packet to %02x:%02x ...\n", dest->u8[0], dest->u8[1]);
 
   // Prepare header
   // is_command=true -> this is a sink to node packet (one-to-many)
@@ -400,6 +410,16 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
 
   // Create the route path to attach to the packet to help nodes to forward the packet
   struct source_route route = routing_table_find_route_path(dest);
+
+
+  // TODO remove
+  printf("<resolved_route> Length: %d. For: %02x:%02x Current routing table: [", route.length, dest->u8[0], dest->u8[1]);
+  int k = 0;
+  for (k = 0; k < route.length; k++) {
+    printf("%02x:%02x, ", route.route[k].u8[0], route.route[k].u8[1]);
+  }
+  printf("]\n");
+
 
   // Check for errors or detected loops
   if (route.route == NULL) {
@@ -416,10 +436,20 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   linkaddr_t next_node = route.route[0];
 
   // Fill routing path excluding first node
-  int i = 1;
-  for (i = 1; i < path_length; i++) {
-    path[i] = route.route[i];
+  int i = 0;
+  for (i = 0; i < path_length; i++) {
+    printf("<out> <command> AAA copying: (node: %02x:%02x)\n", route.route[i + 1].u8[0], route.route[i + 1].u8[1]);
+    path[i] = route.route[i + 1];
   }
+
+  // TODO remove log
+  printf("<out> <command> AAA copied: (dest: %02x:%02x, length: %d route: [", dest->u8[0], dest->u8[1], path_length);
+  int u = 0;
+  for (u = 0; u < path_length; u++) {
+    printf("%02x:%02x, ", path[u].u8[0], path[u].u8[1]);
+  }
+  printf("])\n");
+
 
   // Route is no more needed
   free(route.route);
