@@ -42,3 +42,5 @@ $ python parse-stats.py loglistener.txt
     - vicversa -> il nodo non lo puo' sapere. Pero' se nel msg c'e' la lista di  nodi incontrati, questo il loop essere evitato facendo controlli sulla lista.
 
 - sr_send = sourceRouting_send
+
+- Beacon in arrivo: a parita' di metric controllare se l'rssi e' migliore per avere comunque un link piu' "stabile" e "sicuro".

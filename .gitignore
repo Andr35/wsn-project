@@ -247,3 +247,4 @@ contiki-sky*
 src/sent.csv
 src/recv.csv
 *.sky
+*.testlog
