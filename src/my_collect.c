@@ -155,7 +155,6 @@ int my_collect_send(struct my_collect_conn *conn) {
 
   if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
     printf("<out> <packet> <ERROR> Trying to send a data collection packet but node's parent is missing!\n");
-    packetbuf_clear();
     return 0; // no parent
   }
 
@@ -169,7 +168,6 @@ int my_collect_send(struct my_collect_conn *conn) {
 
   if (alloc_res == 0) { // Allocation failed -> report error
     printf("<out> <packet> <ERROR> Trying to send a data collection packet but node fails allocating header buffer!\n");
-    packetbuf_clear();
     return 0;
   }
 
@@ -193,7 +191,6 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
 
   if (packetbuf_datalen() < sizeof(struct collect_header)) {
     printf("<in_> <packet> <ERROR> Received a too short unicast packet! (length: %d)\n", packetbuf_datalen());
-    packetbuf_clear();
     return;
   }
 
@@ -239,7 +236,6 @@ void handle_recv_data_collection_packet_sink(struct my_collect_conn *conn, struc
 
   if (path_length == 0) { // Error -> "no one send me the packet" -> some node does not respect model
     printf("<in_> <packet> <ERROR> path_length value in header is wrong -> path_length is 0\n");
-    packetbuf_clear();
     return;
   }
 
@@ -260,7 +256,6 @@ void handle_recv_data_collection_packet_sink(struct my_collect_conn *conn, struc
 
   if (hdr_reduce_res == 0) {
     printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be delivered to app!\n");
-    packetbuf_clear();
     return;
   }
 
@@ -284,7 +279,6 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
   // Check for parent existence
   if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
     printf("<in_> <packet> <ERROR> Trying to forward a packet but node's parent is missing!\n");
-    packetbuf_clear();
     return; // no parent
   }
 
@@ -293,7 +287,8 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
   linkaddr_t path[path_length];
   memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
 
-  printf("<in_> <packet> New collection packet to forward: (from: %02x:%02x, source: %02x:%02x, hops: %u, length: %u)\n");
+  printf("<in_> <packet> New collection packet to forward: (from: %02x:%02x, source: %02x:%02x, hops: %u, length: %u)\n",
+    from->u8[0], from->u8[1], hdr->source.u8[0], hdr->source.u8[1], hdr->hops, hdr->path_length);
 
   // Check for loops -> if this node is present in path contained in packet, packet is
   // already been forwarded by this node -> drop
@@ -301,7 +296,6 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
 
   if (node_count > 0) { // Loop -> stop forwarding
     printf("<in_> <packet> <ERROR> Packet cannot be forwarded beacuse a loop has been detected analyzing path");
-    packetbuf_clear();
     return;
   }
 
@@ -310,7 +304,6 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
 
   if (hdr_reduce_res == 0) {
     printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be forwarded!\n");
-    packetbuf_clear();
     return;
   }
 
@@ -328,7 +321,6 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
 
   if (alloc_res == 0) { // Allocation failed -> report error
     printf("<in_> <packet> <ERROR> Trying to forward a data collection packet but node fails allocating header buffer!\n");
-    packetbuf_clear();
     return;
   }
 
@@ -361,7 +353,6 @@ void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_hea
   if (is_the_sink) {
 
     printf("<in_> <command> <ERROR> Sink received a command packet! It will be discarded\n");
-    packetbuf_clear(); // Clear packetbuf
     return;
 
   // Common node ////////////////////////////////
@@ -440,7 +431,6 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
   // Check for errors or detected loops
   if (route.route == NULL) {
     printf("<out> <command> <ERROR> Cannot send command since source routing path cannot be created (loop detected or missing info)!\n");
-    packetbuf_clear(); // Clear packetbuf
     return 0;
   }
 
@@ -469,7 +459,6 @@ int sr_send(struct my_collect_conn *conn, const linkaddr_t *dest) {
 
   if (alloc_res == 0) { // Allocation failed -> report error
     printf("<out> <command> <ERROR> Trying to send a command packet but node fails allocating header buffer!\n");
-    packetbuf_clear(); // Clear packetbuf
     return 0;
   }
 
