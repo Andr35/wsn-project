@@ -75,7 +75,21 @@ int sr_send(struct my_collect_conn *c, const linkaddr_t *dest);
 
 
 
-void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from);
+/**
+ * Handle the reception of a data collection packet.
+ * If node is sink -> deliver packet to app
+ * If node is a common node -> forward packet to parent
+ *
+ */
+
+void handle_recv_data_collection_packet_sink(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from);
+void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from);
+
+
+/**
+ * Handle the reception of a command packet.
+ *
+ */
 void handle_recv_command_packet(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from);
 
 void initialize_sink(struct my_collect_conn* conn);

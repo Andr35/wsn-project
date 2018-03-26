@@ -209,7 +209,30 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
   if (hdr.is_command) { // Packet is of type "command" (sent from sink)
     handle_recv_command_packet(conn, &hdr, from);
   } else { // Packet is of type "data collection"
-    handle_recv_data_collection_packet(conn, &hdr, from);
+
+    // TODO remove
+    printf("<in_> <packet> Received (datalen: %d, path_length: %d, hops: %u, from: %02x:%02x, source: %02x:%02x) [",
+      packetbuf_datalen(), hdr.path_length, hdr.hops, from->u8[0], from->u8[1], hdr.source.u8[0], hdr.source.u8[1]);
+    // TODO remove
+    linkaddr_t path[hdr.path_length];
+    memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * hdr.path_length);
+
+    // TODO remove
+    int i;
+    for (i = 0; i < hdr.path_length; i++) {
+      printf("%02x:%02x,", path[i].u8[0], path[i].u8[1]);
+    }
+    printf("]\n");
+
+
+    if (is_the_sink) {
+      // Sink ///////////////////////////////////////
+      handle_recv_data_collection_packet_sink(conn, &hdr, from);
+    } else {
+      // Common node ////////////////////////////////
+      handle_recv_data_collection_packet_node(conn, &hdr, from); // TODO enable
+    }
+
   }
 }
 
@@ -220,131 +243,135 @@ void uc_recv(struct unicast_conn *uc_conn, const linkaddr_t *from) {
  * If node is a common node -> forward packet to parent
  *
  */
-void handle_recv_data_collection_packet(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from) {
+void handle_recv_data_collection_packet_sink(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from) {
 
-  // Sink ///////////////////////////////////////
-  if (is_the_sink) {
+  // Collect all <parent, child> relationships contained into the path
+  uint8_t path_length = hdr->path_length;
+  linkaddr_t path[path_length];
 
-    // Collect all <parent, child> relationships contained into the path
-    uint8_t path_length = hdr->path_length;
-    linkaddr_t path[path_length];
+  // Get route path from packet
+  memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
 
-    // Get route path from packet
-    memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
-
-    if (path_length == 0) { // Error -> "no one send me the packet" -> some node does not respect model
-      printf("<in_> <packet> <ERROR> path_length value in header is wrong -> path_length is 0");
-      packetbuf_clear();
-      return;
-    }
-
-    // Save <parent, child> relationship into routing table
-    // Iterate over "path" array and consider i-element as parent and (i+1)-element as child
-    int i;
-    for (i = 0; i < (path_length - 1); i++) { // -1 last element has no child
-      linkaddr_t parent = path[i];
-      linkaddr_t child = path[i + 1];
-      // Update routing table
-      routing_table_update_entry(&parent, &child);
-    }
-    // Add special pair <sink, last_path_elem>
-    routing_table_update_entry(&linkaddr_node_addr, &path[0]);
-
-    // Remove header
-      // TODO remove
-    printf("<reduced> before datalen: %d \n", packetbuf_datalen());
-    int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length));
-      // TODO remove
-    printf("<reduced> path_length: %d  reduced: %d datalen: %d \n",
-      path_length, sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length), packetbuf_datalen());
-
-    if (hdr_reduce_res == 0) {
-      printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be delivered to app!\n");
-      packetbuf_clear();
-      return;
-    }
-
-    // Deliver packet to application
-    conn->callbacks->recv(&(hdr->source), hdr->hops);
-
-    // TODO if hops > 0 msg packet has wrong length!!! -> solve!!! -> real msg length = 2
-
-    printf("<in_> <packet> <SUCCESS> Packet arrived to the sink! (source: %02x:%02x, hops: %u)\n",
-      hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
-
-  // Common node ////////////////////////////////
-  } else { // Packet needs to be forwarded to parent
-
-    // Check for parent existence
-    if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
-      printf("<in_> <packet> <ERROR> Trying to forward a packet but node's parent is missing!\n");
-      packetbuf_clear();
-      return; // no parent
-    }
-
-    // Extract routing path from packet
-    uint8_t path_length = hdr->path_length;
-    linkaddr_t path[path_length];
-    memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
-
-    // TODO remove printf or simplify
-    int i;
-    printf("<in_> <packet> New collection packet to forward: (from: %02x:%02x, source: %02x:%02x, hops: %u, length: %u) [",
-      from->u8[0], from->u8[1], hdr->source.u8[0], hdr->source.u8[1], hdr->hops, path_length);
-    for (i = 0; i < path_length; i++) {
-      printf("%02x:%02x,", path[i].u8[0], path[i].u8[1]);
-    }
-    printf("]\n");
-
-
-    // Check for loops -> if this node is present in path contained in packet, packet is
-    // already been forwarded by this node -> drop
-    int node_count = check_loop_presence(path, path_length, linkaddr_node_addr);
-
-    if (node_count > 0) { // Loop -> stop forwarding
-      printf("<in_> <packet> <ERROR> Packet cannot be forwarded beacuse a loop has been detected analyzing path");
-      packetbuf_clear();
-      return;
-    }
-
-    // Add current node address to the route path contained in packet
-
-    // Update path length in header before forward
-    hdr->path_length += 1;
-    // Update hops in header before forward
-    hdr->hops += 1;
-
-    // TODO remove
-    printf("BBBBBBBBBBB current hdr length %d current data length %d for path length %d\n",
-     packetbuf_hdrlen(), packetbuf_datalen(), hdr->path_length);
-
-
-    // Allocate extra space in buffer header for new address
-    // TODO should be: packetbuf_hdralloc(sizeof(linkaddr_t))
-    int alloc_res = packetbuf_hdralloc(sizeof(struct collect_header) + (sizeof(linkaddr_t) * hdr->path_length)); // header + path array
-
-    printf("zzzzzzzzzzzzzzzzzzzzz new space hdrlen: %d datalen: %d \n", packetbuf_hdrlen(), packetbuf_datalen()); // TODO remove
-
-    if (alloc_res == 0) { // Allocation failed -> report error
-      printf("<in_> <packet> <ERROR> Trying to forward a data collection packet but node fails allocating header buffer!\n");
-      return;
-    }
-
-    // Overwrite the header present in packet buffer
-    memcpy(packetbuf_hdrptr(), hdr, sizeof(struct collect_header));
-    // Add current node address in packet buffer [_, D, E, F] -> [A, D, E, F]
-    memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &linkaddr_node_addr, sizeof(linkaddr_t));
-    // Overwrite path in packet (should be unuseful)
-    memcpy(packetbuf_hdrptr() + sizeof(struct collect_header) + sizeof(linkaddr_t), &path, (sizeof(linkaddr_t) * path_length));
-
-    // TODO remove
-    printf("EEEEEEEEEEE forwarding packet hdrlen %d datalen %d  path length: %d \n", packetbuf_hdrlen() ,packetbuf_datalen(), hdr->path_length);
-
-    // Forward the packet to parent
-    unicast_send(&conn->uc, &conn->parent);
-    printf("<in_> <packet> Packet forwarded to %02x:%02x (current hops: %u)\n", conn->parent.u8[0], conn->parent.u8[1], hdr->hops);
+  if (path_length == 0) { // Error -> "no one send me the packet" -> some node does not respect model
+    printf("<in_> <packet> <ERROR> path_length value in header is wrong -> path_length is 0\n");
+    packetbuf_clear();
+    return;
   }
+
+  // Save <parent, child> relationship into routing table
+  // Iterate over "path" array and consider i-element as parent and (i+1)-element as child
+  int i;
+  for (i = 0; i < (path_length - 1); i++) { // -1 last element has no child
+    linkaddr_t parent = path[i];
+    linkaddr_t child = path[i + 1];
+    // Update routing table
+    routing_table_update_entry(&parent, &child);
+  }
+  // Add special pair <sink, last_path_elem>
+  routing_table_update_entry(&linkaddr_node_addr, &path[0]);
+
+  // Remove header
+  int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length));
+
+  if (hdr_reduce_res == 0) {
+    printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be delivered to app!\n");
+    packetbuf_clear();
+    return;
+  }
+
+  // Deliver packet to application
+  conn->callbacks->recv(&(hdr->source), hdr->hops);
+
+  // TODO if hops > 0 msg packet has wrong length!!! -> solve!!! -> real msg length = 2
+
+  printf("<in_> <packet> <SUCCESS> Packet arrived to the sink! (source: %02x:%02x, hops: %u)\n",
+    hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
+
 }
+
+
+/**
+ * Handle the reception of a data collection packet.
+ * If node is sink -> deliver packet to app
+ * If node is a common node -> forward packet to parent
+ *
+ */
+void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struct collect_header *hdr, const linkaddr_t *from) {
+  // Packet needs to be forwarded to parent
+
+  // Check for parent existence
+  if (linkaddr_cmp(&conn->parent, &linkaddr_null)) {
+    printf("<in_> <packet> <ERROR> Trying to forward a packet but node's parent is missing!\n");
+    packetbuf_clear();
+    return; // no parent
+  }
+
+  // Extract routing path from packet
+  uint8_t path_length = hdr->path_length;
+  linkaddr_t path[path_length];
+  memcpy(&path, packetbuf_dataptr() + sizeof(struct collect_header), sizeof(linkaddr_t) * path_length);
+
+  // TODO remove printf or simplify
+  int i;
+  printf("<in_> <packet> New collection packet to forward: (from: %02x:%02x, source: %02x:%02x, hops: %u, length: %u) [",
+    from->u8[0], from->u8[1], hdr->source.u8[0], hdr->source.u8[1], hdr->hops, path_length);
+  for (i = 0; i < path_length; i++) {
+    printf("%02x:%02x,", path[i].u8[0], path[i].u8[1]);
+  }
+  printf("]\n");
+
+
+  // Check for loops -> if this node is present in path contained in packet, packet is
+  // already been forwarded by this node -> drop
+  int node_count = check_loop_presence(path, path_length, linkaddr_node_addr);
+
+  if (node_count > 0) { // Loop -> stop forwarding
+    printf("<in_> <packet> <ERROR> Packet cannot be forwarded beacuse a loop has been detected analyzing path");
+    packetbuf_clear();
+    return;
+  }
+
+  // Remove header
+  int hdr_reduce_res = packetbuf_hdrreduce(sizeof(struct collect_header) + (sizeof(linkaddr_t) * path_length));
+
+  if (hdr_reduce_res == 0) {
+    printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be forwarded!\n");
+    packetbuf_clear();
+    return;
+  }
+
+  // Rewrite header
+  // + Add current node address to the route path contained in packet
+
+  // Update path length in header before forward
+  hdr->path_length += 1;
+  // Update hops in header before forward
+  hdr->hops += 1;
+
+  // Allocate space in buffer for header and path
+  // header = header + old path array + current node addr
+  int alloc_res = packetbuf_hdralloc(sizeof(struct collect_header) + (sizeof(linkaddr_t) * hdr->path_length));
+
+  if (alloc_res == 0) { // Allocation failed -> report error
+    printf("<in_> <packet> <ERROR> Trying to forward a data collection packet but node fails allocating header buffer!\n");
+    packetbuf_clear();
+    return;
+  }
+
+  // TODO probalbe error -> not use hdrptr!
+  // Overwrite the header present in packet buffer
+  memcpy(packetbuf_hdrptr(), hdr, sizeof(struct collect_header));
+  // Add current node address in packet buffer [_, D, E, F] -> [A, D, E, F]
+  memcpy(packetbuf_hdrptr() + sizeof(struct collect_header), &linkaddr_node_addr, sizeof(linkaddr_t));
+  // Overwrite path in packet (should be unuseful)
+  memcpy(packetbuf_hdrptr() + sizeof(struct collect_header) + sizeof(linkaddr_t), &path, sizeof(linkaddr_t) * path_length);
+
+  // Forward the packet to parent
+  unicast_send(&conn->uc, &conn->parent);
+  printf("<in_> <packet> Packet forwarded to %02x:%02x (current hops: %u)\n", conn->parent.u8[0], conn->parent.u8[1], hdr->hops);
+
+}
+
 
 /**
  * Handle the reception of a "command" packet sent by sink.
