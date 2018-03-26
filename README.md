@@ -37,6 +37,7 @@ $ python parse-stats.py loglistener.txt
   perche' fa maggior affidamento a seqn piu' freschi
 
 - solo quando il parent cambia -> invia specifico topology report (usa un timer per inviarlo un po' dopo il timer)
+  --> riconoscere messaggio "topology report": avra' datalen=0 dopo hdrreduce (?)
   NB: appunti per report: anche senza topology report dedicato, i risultati sono ottimi:
 
     ----- Data Collection Overall Statistics -----
