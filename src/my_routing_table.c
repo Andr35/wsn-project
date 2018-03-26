@@ -75,45 +75,21 @@ void routing_table_update_entry(const linkaddr_t *parent, const linkaddr_t *chil
     }
 
     // Set values
-    new_entry->parent = *parent; // TODO copy addr?
-    new_entry->child = *child; // TODO copy addr?
+    new_entry->parent = *parent;
+    new_entry->child = *child;
 
     // Set pointer
     routing_table[index] = new_entry;
     return; // Child inserted -> nothing more to do
 
   } else { // Update the existing entry replacing the parent
-    current_entry->parent = *parent; // TODO copy addr?
+    current_entry->parent = *parent;
   }
-
-  // TODO remove
-  // printf("Current routing table: [\n");
-  // int i = 0;
-  // for (i = 0; i < 11; i++) {
-  //   if (routing_table[i] != NULL) {
-  //   printf("  child: %02x:%02x, parent: %02x:%02x\n",
-  //     routing_table[i]->child.u8[0], routing_table[i]->child.u8[1], routing_table[i]->parent.u8[0], routing_table[i]->parent.u8[1]);
-  //   }
-  // }
-  // printf("]\n");
-
 }
 
 
 struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
   printf("<routing_table> <find_route> Search route for %02x:%02x\n", dest->u8[0], dest->u8[1]);
-
-    // TODO remove
-  printf("<routing_table> Current routing table: [\n");
-  int i = 0;
-  for (i = 0; i < 11; i++) {
-    if (routing_table[i] != NULL) {
-    printf("<routing_table>  child: %02x:%02x, parent: %02x:%02x\n",
-      routing_table[i]->child.u8[0], routing_table[i]->child.u8[1], routing_table[i]->parent.u8[0], routing_table[i]->parent.u8[1]);
-    }
-  }
-  printf("<routing_table>   ]\n");
-
 
   // Init route with dest node
   linkaddr_t* route = (linkaddr_t*) malloc(sizeof(linkaddr_t));
@@ -165,15 +141,6 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
   if (linkaddr_cmp(&linkaddr_node_addr, &current_node)) { // Arrived to sink
     // Route (from child to sink) is complete -> reverse it and remove sink
 
-    // TODO remove
-    printf("<routing_table> <find_route> TEMP length: %d [", route_length);
-    int b = 0;
-    for (b = 0; b < route_length; b++) {
-      printf("%02x:%02x, ", route[b].u8[0], route[b].u8[1]);
-    }
-    printf("]\n");
-
-
     // Alloc space for new array
     int result_length = route_length - 1; // -1 exclude sink node from array (the last node inserted to route tail)
     linkaddr_t* result = (linkaddr_t*) malloc(sizeof(linkaddr_t) * result_length);
@@ -185,14 +152,6 @@ struct source_route routing_table_find_route_path(const linkaddr_t *dest) {
     }
 
     printf("<routing_table> <find_route> Complete route found\n");
-
-    // TODO remove
-    printf("<routing_table> <find_route> Complete route length: %d [", result_length);
-    int k = 0;
-    for (k = 0; k < result_length; k++) {
-      printf("%02x:%02x, ", result[k].u8[0], result[k].u8[1]);
-    }
-    printf("]\n");
 
     return (struct source_route) {.route = result, .length = result_length};
 
