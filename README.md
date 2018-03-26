@@ -33,6 +33,23 @@ $ python parse-stats.py loglistener.txt
 - SLIDE 11 - Dedicated topology report vs piggybacking: deve essere bilanciato in base a quanti dati passano -> il root/sink invia un beacon -> il nodo usa un timer random prima di inviare il dedicated report per evitare floodings.
 -> gestire l'invio (decidere) del report. Ogni volta che un msg parte (report o applicaiton message) setta un timer -> non inviare altri reports prima che il timer scada.
 
+- consider (beacon.seqn > conn->beacon_seqn) and (beacon.seqn == conn->beacon_seqn) separately -> cosi' il nodo puo' anche essere mosso
+  perche' fa maggior affidamento a seqn piu' freschi
+
+- solo quando il parent cambia -> invia specifico topology report (usa un timer per inviarlo un po' dopo il timer)
+  NB: appunti per report: anche senza topology report dedicato, i risultati sono ottimi:
+
+    ----- Data Collection Overall Statistics -----
+    Total Number of Packets Sent: 531
+    Total Number of Packets Received: 529
+    Overall PDR = 99.62%
+    Overall PLR = 0.38%
+    ----- Source Routing Overall Statistics -----
+    Total Number of Packets Sent: 172
+    Total Number of Packets Received: 172
+    Overall PDR = 100.00%
+    Overall PLR = 0.00%
+
 - con Duty Cycle -> 80% dc
 
 - Come evitare collisioni? (cooja -> blue transmit, green: received, red: failure or collision)

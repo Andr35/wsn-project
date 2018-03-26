@@ -109,6 +109,9 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
 
   // Check if beacon is new or is the current one (already seen but maybe with a better metric) ->
   // if true, analyze beacon metric (otherwise discard it)
+
+  // TODO rewrite  -> consider (beacon.seqn > conn->beacon_seqn) and (beacon.seqn == conn->beacon_seqn) separately
+
   if (beacon.seqn >= conn->beacon_seqn) { // Beacon has higher seqn than every beacon already seen
 
     // Update current beacon seqn with the newest
