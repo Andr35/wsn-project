@@ -10,7 +10,7 @@
 #include "my_collect.h"
 #include "my_routing_table.h"
 
-#define BEACON_INTERVAL (CLOCK_SECOND*10) // TODO set (CLOCK_SECOND*60)
+#define BEACON_INTERVAL (CLOCK_SECOND*60) // TODO set (CLOCK_SECOND*60)
 #define BEACON_FORWARD_DELAY (random_rand() % CLOCK_SECOND)
 
 #define RSSI_THRESHOLD -95
@@ -24,6 +24,7 @@ struct broadcast_callbacks bc_cb = {.recv=bc_recv};
 struct unicast_callbacks uc_cb = {.recv=uc_recv};
 
 bool is_the_sink = false;
+struct ctimer dedicated_topology_report_timer;
 
 /*--------------------------------------------------------------------------------------*/
 void my_collect_open(struct my_collect_conn* conn, uint16_t channels, bool is_sink, const struct my_collect_callbacks *callbacks) {
@@ -155,6 +156,9 @@ void update_node_parent(struct my_collect_conn *conn, uint16_t beacon_metric, co
       conn->parent_rssi = parent_rssi;
       linkaddr_copy(&conn->parent, sender);
 
+      printf("<in_> <beacon> Node has a new parent %02x:%02x (current metric: %u, parent rssi: %d)\n",
+        sender->u8[0], sender->u8[1], conn->metric, conn->parent_rssi);
+
       // Retransmit beacon to other nodes (with updated metric)
       // Wait some random time to avoid (hopefully) collisions
       printf("<in_> <beacon> Schedule beacon forwarding in %lu seconds\n", BEACON_FORWARD_DELAY);
@@ -163,12 +167,30 @@ void update_node_parent(struct my_collect_conn *conn, uint16_t beacon_metric, co
       // in sink these lines of code are never executed (sink has always metric = 0)
       ctimer_set(&conn->beacon_timer, BEACON_FORWARD_DELAY, send_beacon_cb, conn);
 
-      printf("<in_> <beacon> Node has a new parent %02x:%02x (current metric: %u, parent rssi: %d)\n",
-        sender->u8[0], sender->u8[1], conn->metric, conn->parent_rssi);
+      // Inform the sink of the new parent using a dedicated topology report
+      unsigned short topology_report_delay = (BEACON_FORWARD_DELAY + (BEACON_FORWARD_DELAY * (10 - conn->metric))) +
+      ((random_rand() % CLOCK_SECOND) * (1 / conn->metric)); // TODO ok?
 
+      if (topology_report_delay > BEACON_INTERVAL) {
+        topology_report_delay = BEACON_INTERVAL - 5; // TODO ok?
+      }
+
+      printf("<in_> <beacon> Schedule sending of dedicated topology report in %u seconds\n", topology_report_delay);
+      ctimer_set(&dedicated_topology_report_timer, topology_report_delay, send_topology_report_cb, conn);
 }
 
 
+/* Send topology reports --------------------------------------------------------------*/
+
+void send_topology_report_cb(void* ptr) {
+  // Cast param
+  struct my_collect_conn *conn = (struct my_collect_conn *)ptr;
+
+  packetbuf_clear();
+  packetbuf_set_datalen(0);
+  int res = my_collect_send(conn);
+  printf("<out> <toprep> Sent dedicated topology report result: %d\n", res);
+}
 
 /* Handling data packets --------------------------------------------------------------*/
 
@@ -285,11 +307,20 @@ void handle_recv_data_collection_packet_sink(struct my_collect_conn *conn, struc
     return;
   }
 
-  // Deliver packet to application
-  conn->callbacks->recv(&(hdr->source), hdr->hops);
+  // Check if packet is of type "data collection" or "dedicated topology report" (ie: it has no data part)
+  if (packetbuf_datalen() == 0) {
+    // Dedicated topology packet should not be delivered to app
+    printf("<in_> <packet> <SUCCESS> Dedicated topology packet arrived to the sink (source: %02x:%02x, hops: %u)\n",
+      hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
 
-  printf("<in_> <packet> <SUCCESS> Packet arrived to the sink! (source: %02x:%02x, hops: %u)\n",
-    hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
+  } else {
+    // Deliver packet to application
+    conn->callbacks->recv(&(hdr->source), hdr->hops);
+
+    printf("<in_> <packet> <SUCCESS> Packet arrived to the sink and delivered! (source: %02x:%02x, hops: %u)\n",
+      hdr->source.u8[0], hdr->source.u8[1], hdr->hops);
+  }
+
 }
 
 
@@ -331,6 +362,13 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
   if (hdr_reduce_res == 0) {
     printf("<in_> <packet> <ERROR> Fail to reduce header. Packet will not be forwarded!\n");
     return;
+  }
+
+
+  // Check if packet is a "dedicated topology report" (it has no data) ->
+  // if true, stop timer used by current node to send its dedicated topology report (it would be redundant)
+  if (packetbuf_datalen() == 0 && ctimer_expired(&dedicated_topology_report_timer) == 0) {
+    ctimer_stop(&dedicated_topology_report_timer);
   }
 
   // Rewrite header
@@ -519,5 +557,8 @@ void initialize_sink(struct my_collect_conn* conn) {
     // t	The interval before the timer expires.
     // f	A function to be called when the timer expires.
     // ptr	An opaque pointer that will be supplied as an argument to the callback function.
+
+    // Send first beacon and then setup timer
+    beacon_timer_cb(conn);
     ctimer_set(&conn->beacon_timer, BEACON_INTERVAL, beacon_timer_cb, conn);
 }

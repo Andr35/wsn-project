@@ -72,6 +72,11 @@ int my_collect_send(struct my_collect_conn *c);
 void update_node_parent(struct my_collect_conn *conn, uint16_t beacon_metric, const linkaddr_t *sender, int16_t parent_rssi);
 
 
+/**
+ * Callback triggered after a certain period of time to send dedicated topology reports to sink.
+ */
+void send_topology_report_cb(void* ptr);
+
 /* Source routing send function:
  *
  * Params:
