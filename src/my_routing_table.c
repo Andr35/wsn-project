@@ -75,15 +75,15 @@ void routing_table_update_entry(const linkaddr_t *parent, const linkaddr_t *chil
     }
 
     // Set values
-    new_entry->parent = *parent;
-    new_entry->child = *child;
+    linkaddr_copy(&new_entry->parent, parent);
+    linkaddr_copy(&new_entry->child, child);
 
     // Set pointer
     routing_table[index] = new_entry;
     return; // Child inserted -> nothing more to do
 
   } else { // Update the existing entry replacing the parent
-    current_entry->parent = *parent;
+    linkaddr_copy(&current_entry->parent, parent);
   }
 }
 
@@ -192,7 +192,7 @@ linkaddr_t* route_add_node(linkaddr_t* array, int length, linkaddr_t node) {
     new_array[i] = array[i];
   }
   // Add new node on tail
-  new_array[length] = node;
+  linkaddr_copy(&new_array[length], &node);
 
   // Free space
   free(array);

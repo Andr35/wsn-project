@@ -51,6 +51,16 @@ $ python parse-stats.py loglistener.txt
     Overall PDR = 100.00%
     Overall PLR = 0.00%
 
+
+  NB: con analisi di beacon seqn e metric i risultati peggiorano:
+
+  ----- Data Collection Overall Statistics -----
+  Total Number of Packets Sent: 531
+  Total Number of Packets Received: 464
+  Overall PDR = 87.38%
+  Overall PLR = 12.62%
+
+
 - con Duty Cycle -> 80% dc
 
 - Come evitare collisioni? (cooja -> blue transmit, green: received, red: failure or collision)

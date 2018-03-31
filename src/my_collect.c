@@ -107,44 +107,67 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
   // TASK 3: analyse the received beacon, update the routing info (parent, metric), if needed
   // TASK 4: retransmit the beacon if the metric or the seqn has been updated
 
-  // Check if beacon is new or is the current one (already seen but maybe with a better metric) ->
-  // if true, analyze beacon metric (otherwise discard it)
+  // Check seqn:
+  // - (seqn > current seqn) -> update parent (without considering metric because it is a fresher beacon)
+  // - (seqn < current seqn) -> old beacon, ignore it
+  // - (seqn = current seqn) -> check if current beacon has better metric:
+  //   - (metric < current metric)          -> update parent
+  //   - (metric >= current metric)         -> ignore beacon
+  //   - (metric = current parent's metric) -> check RSSI to decide if update parent is convenient
 
-  // TODO rewrite  -> consider (beacon.seqn > conn->beacon_seqn) and (beacon.seqn == conn->beacon_seqn) separately
+  if (rssi > RSSI_THRESHOLD) { // Discard beacon if rssi value is poor
 
-  if (beacon.seqn >= conn->beacon_seqn) { // Beacon has higher seqn than every beacon already seen
+    if (beacon.seqn > conn->beacon_seqn) {
+      // Beacon has higher seqn than every beacon already seen
 
-    // Update current beacon seqn with the newest
-    conn->beacon_seqn = beacon.seqn;
+      // Update current beacon seqn with the newest
+      conn->beacon_seqn = beacon.seqn;
 
-    // Update parent if metric is better and RSSI is tolerable (> -95 dBm)
-    // TODO use "beacon.metric + 1" or "beacon.metric"?
-    // 1) avoid extra broadcast if metric distance not change (same node contact current node with the same metric
-    //    and the current node avoid to re-broadcast the beacon)
-    // 2) if same node with the same metric recontact the current node, it rebroadcast the beacon ->
-    //    other nodes have the possibility to listen for the beacon if the first time has missed it
-    if (((beacon.metric) < conn->metric)  && (rssi > RSSI_THRESHOLD)) {
-      printf("<in_> <beacon> Received beacon has a better metric (%u < %u) New parent is node %02x:%02x\n",
-        beacon.metric, conn->metric, sender->u8[0], sender->u8[1]);
+      // Current beacon if "fresher" than the last seen -> do not take into account metric and update parent directly
+      // (eg: if node has been moved, around topology is completely changed and metric is meaningless)
+      update_node_parent(conn, beacon.metric, sender, rssi); // Update current parent
 
+    } else if (beacon.seqn == conn->beacon_seqn) {
+      // Beacon is not new and is not old -> could have a better metric
+
+      if ((beacon.metric == (conn->metric - 1))  && (rssi < conn->parent_rssi)) {
+        // Beacon metric is the same has the current one but rssi is better -> update parent
+        update_node_parent(conn, beacon.metric, sender, rssi); // Update current parent
+
+      } else if (beacon.metric < conn->metric) {
+        // Beacon metric is better -> update parent
+        update_node_parent(conn, beacon.metric, sender, rssi); // Update current parent
+      }
+
+    } else {
+        printf("<in_> <beacon> Received an old beacon (current node seqn %u, beacon seqn: %u). Discarded.\n",
+          conn->beacon_seqn, beacon.seqn);
+    }
+
+  }
+
+}
+
+
+void update_node_parent(struct my_collect_conn *conn, uint16_t beacon_metric, const linkaddr_t *sender, int16_t parent_rssi) {
       // Update current metric info and update parent
-      conn->metric = beacon.metric + 1;
+      conn->metric = beacon_metric + 1;
+      conn->parent_rssi = parent_rssi;
       linkaddr_copy(&conn->parent, sender);
 
       // Retransmit beacon to other nodes (with updated metric)
-      // Wait some random time to avoid (hopefully) collision
+      // Wait some random time to avoid (hopefully) collisions
       printf("<in_> <beacon> Schedule beacon forwarding in %lu seconds\n", BEACON_FORWARD_DELAY);
       // send_beacon(conn);
       // NB: here "&conn->beacon_timer" is used since in normal node it is unused and
       // in sink these lines of code are never executed (sink has always metric = 0)
       ctimer_set(&conn->beacon_timer, BEACON_FORWARD_DELAY, send_beacon_cb, conn);
-    }
 
-  } else {
-      printf("<in_> <beacon> Received an old beacon (current node seqn %u, beacon seqn: %u). Discarded.\n", conn->beacon_seqn, beacon.seqn);
-  }
+      printf("<in_> <beacon> Node has a new parent %02x:%02x (current metric: %u, parent rssi: %d)\n",
+        sender->u8[0], sender->u8[1], conn->metric, conn->parent_rssi);
 
 }
+
 
 
 /* Handling data packets --------------------------------------------------------------*/
@@ -298,7 +321,7 @@ void handle_recv_data_collection_packet_node(struct my_collect_conn *conn, struc
   int node_count = check_loop_presence(path, path_length, linkaddr_node_addr);
 
   if (node_count > 0) { // Loop -> stop forwarding
-    printf("<in_> <packet> <ERROR> Packet cannot be forwarded beacuse a loop has been detected analyzing path");
+    printf("<in_> <packet> <ERROR> Packet cannot be forwarded beacuse a loop has been detected analyzing path\n");
     return;
   }
 

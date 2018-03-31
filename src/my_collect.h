@@ -16,6 +16,7 @@ struct my_collect_conn {
   struct ctimer beacon_timer;
   uint16_t metric;
   uint16_t beacon_seqn;
+  int16_t parent_rssi;
 };
 
 
@@ -60,6 +61,15 @@ void my_collect_open(struct my_collect_conn *conn, uint16_t channels,
 
 /* Send packet to the sink */
 int my_collect_send(struct my_collect_conn *c);
+
+
+/**
+ * - Update current nose's parent,
+ * - Broadcast beacon to other nodes and
+ * - Send a dedicated topology report to sink
+ *
+ */
+void update_node_parent(struct my_collect_conn *conn, uint16_t beacon_metric, const linkaddr_t *sender, int16_t parent_rssi);
 
 
 /* Source routing send function:
