@@ -7,6 +7,9 @@ Wireless Sensor Network Project
 - data collection protocol: handle path metric and beacon seq num overflow
 - handle loops
 
+#### Change RDC
+
+In `project-conf.h` change `NETSTACK_RDC`;
 
 #### Compile and run
 
@@ -28,47 +31,72 @@ $ python parse-stats.py loglistener.txt
 
 ### Notes
 
-- SLIDE 11 - Topology reports -> in piggybacking usa un header flessibile per aggiungere tutti i nodi che hanno fatto forward del messaggio (+ nell'header aggiungi la sua lunghezza per decodificarlo).
-
-- SLIDE 11 - Dedicated topology report vs piggybacking: deve essere bilanciato in base a quanti dati passano -> il root/sink invia un beacon -> il nodo usa un timer random prima di inviare il dedicated report per evitare floodings.
--> gestire l'invio (decidere) del report. Ogni volta che un msg parte (report o applicaiton message) setta un timer -> non inviare altri reports prima che il timer scada -> timer basato anche sulla metrica del nodo (piu' lontano -> sbrigati ad inviare il report per interrompere i timer dei parents).
-
-- consider (beacon.seqn > conn->beacon_seqn) and (beacon.seqn == conn->beacon_seqn) separately -> cosi' il nodo puo' anche essere mosso
-  perche' fa maggior affidamento a seqn piu' freschi
-
-- solo quando il parent cambia -> invia specifico topology report (usa un timer per inviarlo un po' dopo il timer)
-  --> riconoscere messaggio "topology report": avra' datalen=0 dopo hdrreduce (?)
-  NB: appunti per report: anche senza topology report dedicato, i risultati sono ottimi:
-
-    ----- Data Collection Overall Statistics -----
-    Total Number of Packets Sent: 531
-    Total Number of Packets Received: 529
-    Overall PDR = 99.62%
-    Overall PLR = 0.38%
-    ----- Source Routing Overall Statistics -----
-    Total Number of Packets Sent: 172
-    Total Number of Packets Received: 172
-    Overall PDR = 100.00%
-    Overall PLR = 0.00%
+See `nodes.MD`
 
 
-  NB: con analisi di beacon seqn e metric i risultati peggiorano:
+### Final result
 
-  ----- Data Collection Overall Statistics -----
-  Total Number of Packets Sent: 531
-  Total Number of Packets Received: 464
-  Overall PDR = 87.38%
-  Overall PLR = 12.62%
+#### RDC NullRDC
 
+```
+----- Data Collection Overall Statistics -----
+Total Number of Packets Sent: 531
+Total Number of Packets Received: 527
+Overall PDR = 99.25%
+Overall PLR = 0.75%
 
-- con Duty Cycle -> 80% dc
+----- Source Routing Node Statistics -----
+Node 2: TX Packets = 20, RX Packets = 20, PDR = 100.00%, PLR = 0.00%
+Node 3: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 4: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 5: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 6: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 7: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 8: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 9: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 10: TX Packets = 19, RX Packets = 18, PDR = 94.74%, PLR = 5.26%
 
-- Come evitare collisioni? (cooja -> blue transmit, green: received, red: failure or collision)
+----- Source Routing Overall Statistics -----
+Total Number of Packets Sent: 172
+Total Number of Packets Received: 171
+Overall PDR = 99.42%
+Overall PLR = 0.58%
+```
 
-- Evitare loops:
-    - dal sink al nodo -> ok, il sink calcola prima se c'e' un loop
-    - vicversa -> il nodo non lo puo' sapere. Pero' se nel msg c'e' la lista di  nodi incontrati, questo il loop essere evitato facendo controlli sulla lista.
+#### RDC ContikiMAC
 
-- sr_send = sourceRouting_send
+```
+----- Data Collection Node Statistics -----
+Node 2: TX Packets = 59, RX Packets = 58, PDR = 98.31%, PLR = 1.69%
+Node 3: TX Packets = 59, RX Packets = 55, PDR = 93.22%, PLR = 6.78%
+Node 4: TX Packets = 59, RX Packets = 47, PDR = 79.66%, PLR = 20.34%
+Node 5: TX Packets = 59, RX Packets = 53, PDR = 89.83%, PLR = 10.17%
+Node 6: TX Packets = 59, RX Packets = 57, PDR = 96.61%, PLR = 3.39%
+Node 7: TX Packets = 59, RX Packets = 55, PDR = 93.22%, PLR = 6.78%
+Node 8: TX Packets = 59, RX Packets = 45, PDR = 76.27%, PLR = 23.73%
+Node 9: TX Packets = 59, RX Packets = 55, PDR = 93.22%, PLR = 6.78%
+Node 10: TX Packets = 59, RX Packets = 55, PDR = 93.22%, PLR = 6.78%
 
-- Beacon in arrivo: a parita' di metric controllare se l'rssi e' migliore per avere comunque un link piu' "stabile" e "sicuro".
+----- Data Collection Overall Statistics -----
+Total Number of Packets Sent: 531
+Total Number of Packets Received: 480
+Overall PDR = 90.40%
+Overall PLR = 9.60%
+
+----- Source Routing Node Statistics -----
+Node 2: TX Packets = 20, RX Packets = 20, PDR = 100.00%, PLR = 0.00%
+Node 3: TX Packets = 20, RX Packets = 19, PDR = 95.00%, PLR = 5.00%
+Node 4: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 5: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 6: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 7: TX Packets = 19, RX Packets = 18, PDR = 94.74%, PLR = 5.26%
+Node 8: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 9: TX Packets = 19, RX Packets = 19, PDR = 100.00%, PLR = 0.00%
+Node 10: TX Packets = 19, RX Packets = 17, PDR = 89.47%, PLR = 10.53%
+
+----- Source Routing Overall Statistics -----
+Total Number of Packets Sent: 173
+Total Number of Packets Received: 169
+Overall PDR = 97.69%
+Overall PLR = 2.31%
+```
