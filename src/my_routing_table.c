@@ -16,7 +16,6 @@ struct routing_table_entry* *routing_table = NULL;
 
 void routing_table_init() {
 
- // TODO how much allocate?
   routing_table =  (struct routing_table_entry**) malloc(routing_table_size);
 
   // Check if success

@@ -10,8 +10,9 @@
 #include "my_collect.h"
 #include "my_routing_table.h"
 
-#define BEACON_INTERVAL (CLOCK_SECOND*60) // TODO set (CLOCK_SECOND*60)
+#define BEACON_INTERVAL (CLOCK_SECOND*60)
 #define BEACON_FORWARD_DELAY (random_rand() % CLOCK_SECOND)
+#define MAX_PATH_LENGTH 10
 
 #define RSSI_THRESHOLD -95
 
@@ -168,11 +169,10 @@ void update_node_parent(struct my_collect_conn *conn, uint16_t beacon_metric, co
       ctimer_set(&conn->beacon_timer, BEACON_FORWARD_DELAY, send_beacon_cb, conn);
 
       // Inform the sink of the new parent using a dedicated topology report
-      unsigned short topology_report_delay = (BEACON_FORWARD_DELAY + (BEACON_FORWARD_DELAY * (10 - conn->metric))) +
-      ((random_rand() % CLOCK_SECOND) * (1 / conn->metric)); // TODO ok?
+      unsigned short topology_report_delay = BEACON_FORWARD_DELAY + ((MAX_PATH_LENGTH - conn->metric) * (random_rand() % CLOCK_SECOND));
 
       if (topology_report_delay > BEACON_INTERVAL) {
-        topology_report_delay = BEACON_INTERVAL - 5; // TODO ok?
+        topology_report_delay = BEACON_INTERVAL / 2;
       }
 
       printf("<in_> <beacon> Schedule sending of dedicated topology report in %u seconds\n", topology_report_delay);

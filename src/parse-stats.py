@@ -32,7 +32,7 @@ def parse_file(log_file):
 	dsent = {}
 	dsrrecv = {}
 	dsrsent = {}
-	
+
 	# Parse log file and add data to CSV files
 	with open(log_file, 'r') as f:
 		for line in f:
@@ -53,7 +53,7 @@ def parse_file(log_file):
 				# Continue with the following line
 				continue
 
-			# RECV 
+			# RECV
 			m = regex_recv.match(line)
 			if m:
 				# Get dictionary with data
@@ -203,6 +203,6 @@ if __name__ == '__main__':
 	if not os.path.isfile(log_file) or not os.path.exists(log_file):
 		print "Error: No such file."
 		sys.exit(1)
-	
+
 	# Parse log file, create CSV files, and print some stats
 	parse_file(log_file)

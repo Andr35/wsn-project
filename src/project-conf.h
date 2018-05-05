@@ -19,7 +19,7 @@
 #undef NETSTACK_RDC
 #define NETSTACK_RDC nullrdc_driver
 
-//#define NETSTACK_RDC contikimac_driver
+// #define NETSTACK_RDC contikimac_driver
 
 #define NULLRDC_802154_AUTOACK 1
 /*---------------------------------------------------------------------------*/
