@@ -1,0 +1,48 @@
+\section{Architecture}
+\label{sec:architecture}
+
+Here are discussed in details some of the aspects that caracterize the protocol and how nodes handle incoming packets.
+
+\subsection{Beacon handling}
+
+When a beacon packet is received by any node, it is analyzed and dropped or forwarded depending on some factors.
+
+Beacons that have an RSSI value lower than a certain threshold (-95 dB) are discarded.
+
+Depending on the sequence number (\texttt{seqn} header field) contained in the packet, the beacon is handled in different ways:
+
+\begin{itemize}
+
+\item If the value is lower than the last one registered by the node, beacon is considered old and it is discarded.
+
+\item If the value is greater than the last one registered by the node, it means that the beacon contains "more updated" information about the network topology. In this case, the parent's node is updated and become the node from which the beacon comes from. This decision allow the node to be always connected to a parent in contact with the sink even if its position in the network changes in time. In this case the \texttt{metric} field contained in the beacon is not taken in consideration.
+
+\item If the value is equal than the last one registered by the node, \texttt{metric} value is used to decide whether update or not the parent. The parent of the node is replaced with the beacon's sender in two cases: the beacon must have a greater metric than the current parent's node or, if the two metric values are equal, the beacon RSSI must be greater than the one of the current parent.
+
+\end{itemize}
+
+In any case, every time the parent is updated with a new one, the node broadcast the beacon over the network. A random delay before send the packet is used to avoid collisions with beacons broadcast by other nodes.
+
+
+\subsection{Routing table and topology discovery}
+
+The sink node maintains a routing table used to send unicast packets to nodes. The routing table is updated thanks to dedicated topology report packets or using piggybacking. In the latter case, sink uses the data contained in data collection packets to discover the parent-child relationships between nodes. In fact, data collection packets have a \texttt{path} field that contains an array of node's addresses that is populated by every node that forwarded the packet with its address. The sink can read this field and obtain the a chain of nodes from which the packet is pass through from child to parent before reaching its destination.
+
+Notice that the \texttt{path} field contained in every packet is also used by halfway nodes to detect loops. If the \texttt{path} array already contains the address of the node that is handling the packet, it means that it is already passed through the current node and so it is dropped.
+
+
+\subsection{Dedicated Topology Report}
+
+Every node sends dedicated topology reports to the sink when it update its parent to inform the sink about changes in network topology. Reports are sent after a random delay which is lower the most the node is far from the sink (in term of hop counts).
+A node may receive topology reports from children asking it to forward reports to the sink. In this case, if the node has a pending report to send (due to the delay), it drops its own report and attach its information to the child's report and forwards it. This allows to avoid duplicated information and reduce the number of topology reports exchanged in the network in a certain period of time.
+
+
+\subsection{Source Routed Packets (Commands)}
+
+Sink can send unicast packets to any node in the network. Information to calculate the route that the packet should follow to reach the node are stored in the sink's routing table. They are used to iteratively fill the route array adding the address of the next node that will forward the packet until the recipient node is reached. At every iteraction step, the sink verify that in the partially built route array no addresses are present more than one time. Otherwise a loop is detected and the dispatch of the packet is interrupted. The route array is then stored in the \texttt{path} field of the packet. 
+
+Since nodes of the network do not know the address of the sink, they can not infer from the \texttt{source} field that the packet comes from the sink and should be forwarded to the next node in the route array. In order to find a solution to this problem, the \texttt{is\_command} field is used and set to true by the sink. This allows to distinguish packets that should reach the sink from packets that should reach other nodes of the network tree.
+
+
+
+

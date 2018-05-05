@@ -1,0 +1,22 @@
+\section{Build and Run Network Simulation}
+\label{sec:build_and_run}
+
+The source code of the project is divided in 3 main files:
+
+\begin{itemize}
+	\item \texttt{\textbf{app.c}} Contains the code to start the main process.
+	\item \texttt{\textbf{my\_collect.c}} Contains the callbacks and functions that handle the incoming and outgoing packets and deliver them to the app.
+	\item \texttt{\textbf{my\_routing\_table.c}} Contains all the functions to read and update the routing table. Source code of this file is used only by the sink node.
+\end{itemize}
+
+
+In order to compile and build the project, the following commands should be run from the root folder of the project:
+\begin{lstlisting}[language=bash] 
+$ make
+\end{lstlisting}
+
+After building the project, the 2 files \texttt{test.csc} and \texttt{test\_nogui\_dc.csc} can be used to run the protocol in a simulated wireless network using \texttt{cooja}:
+\begin{lstlisting}[language=bash] 
+$ ./cooja test.csc
+$ ./cooja_nogui test_nogui_dc.csc
+\end{lstlisting}

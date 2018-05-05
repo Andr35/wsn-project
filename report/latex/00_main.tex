@@ -1,0 +1,66 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{silence}\WarningsOff[latexfont]
+
+\usepackage{amsmath}
+
+\RequirePackage{tikz}[2010/10/13]
+\usetikzlibrary{arrows,automata,calc,intersections,patterns,decorations.pathmorphing,decorations.pathreplacing}
+
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{url}
+\usepackage[caption=false,font=footnotesize]{subfig}
+\usepackage[binary-units,per-mode=symbol]{siunitx}
+\sisetup{list-final-separator = {, and }}
+\usepackage{booktabs}
+\usepackage{pifont}
+\usepackage{microtype}
+\usepackage{textcomp}
+\usepackage[american]{babel}
+\usepackage[noabbrev,capitalise]{cleveref}
+\usepackage{xspace}
+\usepackage{hyphenat}
+\usepackage[draft,inline,nomargin,index]{fixme}
+\fxsetup{theme=color}
+\usepackage{grffile}
+\usepackage{xfrac}
+\usepackage{multirow}
+\RequirePackage{xstring}
+\RequirePackage{xparse}
+\RequirePackage[index=true]{acro}
+\NewDocumentCommand\acrodef{mO{#1}mG{}}{\DeclareAcronym{#1}{short={#2}, long={#3}, #4}}
+\NewDocumentCommand\acused{m}{\acuse{#1}}
+\usepackage{upquote}
+\usepackage{listings}
+
+\acrodef{DHT}{Distributed Hash Table}
+
+\begin{document}
+
+\title{Source Routing for \\ Downward Data Traffic}
+
+\author{
+	\IEEEauthorblockN{Andrea Zorzi [190964]}
+	\texttt{andrea.zorzi-1@studenti.unitn.it}
+}
+
+\maketitle
+
+\begin{abstract}
+This report presents a simple routing protocol for tree-based topology wireless sensor networks. The protocol is intended to enable data collection from any node of the network to a sink node using multi-hop packet forwarding and at the same time, it allows to a sink node to send "command" packets downwards to any node of the network.
+\end{abstract}
+
+\acresetall
+
+\input{01_introduction}
+\input{02_build_and_run}
+\input{03_packet_model}
+\input{04_architecture}
+\input{05_conclusions}
+\input{06_some_results}
+
+\end{document}
+

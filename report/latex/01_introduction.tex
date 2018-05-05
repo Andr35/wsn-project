@@ -1,0 +1,12 @@
+\section{Introduction}
+\label{sec:introduction}
+
+The protocol presented here has been developed with the aim of allow nodes belonging to a tree topology based wireless sensor network to exchange and forward packets coming from and towards a sink. Packets called "beacons" are periodically broadcasted by a sink node and shared between nodes in order to exchange information about the distance of each node from the sink and are used to maintain the tree topology. Beacons are are spread in a way that network traffic is minimized and nodes that change their place in space are able to reconfigure themselves and be constantly reachable by the sink.
+
+Data collection packets are periodically send by each node to its parent until they reach the sink. 
+This type of packets, meanwhile they travel through the network, are enriched with information about the the route (node addresses) they use to reach the sink. These datas are used by the sink to maintain in a routing table the knowledge about the current network topology.
+
+"Command" packets are used by the sink node to send data to a specific node in the network. According to the current information collected in the routing table, the sink decide whether it is possible to reach a node or not and send the command packet.
+
+The report will first describe the architecture of the network, the organization of the source code and the model of each message presented above.
+Then it will explain how some major issues concerning data forwarding and packet sending are addressed by the protocol.
