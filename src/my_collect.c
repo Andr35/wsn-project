@@ -132,7 +132,7 @@ void bc_recv(struct broadcast_conn *bc_conn, const linkaddr_t *sender) {
     } else if (beacon.seqn == conn->beacon_seqn) {
       // Beacon is not new and is not old -> could have a better metric
 
-      if ((beacon.metric == (conn->metric - 1))  && (rssi < conn->parent_rssi)) {
+      if ((beacon.metric == (conn->metric - 1))  && (rssi > conn->parent_rssi)) {
         // Beacon metric is the same has the current one but rssi is better -> update parent
         update_node_parent(conn, beacon.metric, sender, rssi); // Update current parent
 
